@@ -61,3 +61,13 @@ test('ranks chord families by tier and orb with a per-family limit', () => {
   assert.equal(lattice.get('Step')[0].tier, 'lattice')
   assert.equal(lattice.get('Mirror')[0].orb, 0)
 })
+
+test('excludes inevitable angle-axis chords from interpretive ranking', () => {
+  const lattice = strongestChords([
+    { id: 'asc', kind: 'angle', longitude: 0 },
+    { id: 'dsc', kind: 'angle', longitude: 180 },
+    { id: 'glyph', kind: 'glyph', longitude: 36 },
+  ])
+  assert.ok(!(lattice.get('Mirror') || []).some(contact => contact.first.kind === 'angle' && contact.second.kind === 'angle'))
+  assert.equal(lattice.get('Step')[0].second.kind, 'glyph')
+})
