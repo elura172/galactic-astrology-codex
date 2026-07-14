@@ -446,6 +446,7 @@ input:focus-visible,
 .sky-kind button { padding: 11px; border: 0; background: transparent; font: 9px var(--mono); letter-spacing: .1em; text-transform: uppercase; cursor: pointer; }
 .sky-kind button + button { border-left: 1px solid var(--ink); }
 .sky-kind button.is-active { color: var(--paper); background: var(--ink); }
+.reference-chart { width: 100%; padding: 9px; color: var(--quiet); border: 1px dashed var(--rule); background: transparent; font: 7px var(--mono); letter-spacing: .1em; text-transform: uppercase; cursor: pointer; }
 .sky-drawer form > label, .birth-fields label { display: block; margin: 18px 0; color: var(--quiet); font: 8px var(--mono); letter-spacing: .12em; text-transform: uppercase; }
 .sky-drawer input, .sky-drawer select { display: block; width: 100%; margin-top: 8px; padding: 12px 2px; color: var(--ink); border: 0; border-bottom: 1px solid var(--ink); border-radius: 0; background: transparent; font: 15px var(--serif); text-transform: none; }
 .coordinate-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
@@ -456,6 +457,11 @@ input:focus-visible,
 .sky-privacy b { display: block; margin-bottom: 3px; color: var(--ink); font: 8px var(--mono); letter-spacing: .1em; text-transform: uppercase; }
 .sky-calculate { display: flex; justify-content: space-between; width: 100%; padding: 14px; color: var(--paper); border: 1px solid var(--ink); background: var(--ink); font: 9px var(--mono); letter-spacing: .1em; text-transform: uppercase; cursor: pointer; }
 .sky-calculate:disabled { cursor: wait; opacity: .5; }
+.calculation-progress { margin-top: 13px; }
+.calculation-progress > div { height: 3px; overflow: hidden; background: var(--rule); }
+.calculation-progress i { display: block; width: 0; height: 100%; background: var(--gold); transition: width 240ms ease; }
+.calculation-progress p { display: flex; justify-content: space-between; margin: 7px 0 0; color: var(--quiet); font: 7px var(--mono); text-transform: uppercase; }
+.calculation-progress button { padding: 0; color: var(--rose); border: 0; background: transparent; font: inherit; text-transform: inherit; cursor: pointer; }
 .sky-status { min-height: 32px; color: var(--quiet); font: italic 11px/1.5 var(--serif); }
 .house-resonance { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--ink); }
 .house-resonance > span { color: var(--quiet); font: 7px var(--mono); letter-spacing: .16em; text-transform: uppercase; }
@@ -502,6 +508,7 @@ input:focus-visible,
 .transmission details p { display: grid; grid-template-columns: 28px 1fr; gap: 8px; margin: 0; padding: 8px 0; border-top: 1px solid var(--rule); }
 .transmission details b { color: var(--quiet); font: 7px var(--mono); }
 .transmission details span { font: 10px/1.4 var(--sans); }
+.export-record { display: flex; justify-content: space-between; width: 100%; padding: 14px 25px; color: var(--quiet); border: 0; border-top: 1px solid var(--ink); background: transparent; font: 7px var(--mono); letter-spacing: .12em; text-transform: uppercase; cursor: pointer; }
 .measured-sky { margin: 18px 0; padding: 12px 0; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); }
 .measured-sky > span { color: var(--quiet); font: 7px var(--mono); letter-spacing: .15em; text-transform: uppercase; }
 .measured-sky p { display: flex; justify-content: space-between; gap: 10px; margin: 9px 0; font: 14px var(--serif); }

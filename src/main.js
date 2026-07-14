@@ -1,7 +1,7 @@
 import './style.css'
 import codexMarkdown from '../codex_of_celestial_glyphs.md?raw'
 import { GROUPS, CHORDS, parseCodex, seamCounterpart, chordDestinations, adjacentFaces, relatedGlyphNumbers, classifiedRelationships } from './codex.js'
-import { placementsBySeat, uniqueMeasuredBodies, zodiacLabel } from './sky.js'
+import { fetchEphemerisInBatches, placementsBySeat, technicalRecord, uniqueMeasuredBodies, zodiacLabel } from './sky.js'
 import { chartAngles, houseForLongitude, lineageHouseResonance, MAJOR_BODIES, wholeSignHouses, zonedDateTime } from './chart.js'
 import { conjunction } from './astrology.js'
 import { angleContacts, densestCluster, planetaryCourts, populatedCourts, strongestChords } from './reading.js'
@@ -38,6 +38,7 @@ const state = {
   houses: null,
   skyHighlight: null,
   skyStatus: '',
+  skyController: null,
 }
 
 const app = document.querySelector('#app')
@@ -106,6 +107,7 @@ app.innerHTML = `
   <aside class="sky-drawer" data-sky-drawer aria-hidden="true">
     <div class="sky-drawer__header"><div><span>Ephemeris layer</span><h2>Set the sky</h2></div><button data-sky-close aria-label="Close sky controls">×</button></div>
     <div class="sky-kind" role="group" aria-label="Chart kind"><button class="is-active" data-sky-kind="live">Live sky</button><button data-sky-kind="birth">Birth chart</button></div>
+    <button class="reference-chart" data-reference-chart>Load Greenwich · J2000 reference</button>
     <form data-sky-form>
       <label>Moment in local time<input type="datetime-local" name="moment" required></label>
       <div class="birth-fields" data-birth-fields hidden>
@@ -117,6 +119,7 @@ app.innerHTML = `
       </div>
       <div class="sky-privacy"><i>◇</i><p><b>Transient by design</b>Nothing entered here is saved. The ephemeris service receives only the selected instant and canonical body identifiers.</p></div>
       <button class="sky-calculate" type="submit">Calculate glyph field <span>→</span></button>
+      <div class="calculation-progress" data-calculation-progress hidden><div><i data-progress-bar></i></div><p><span data-progress-count>0 / 106</span><button type="button" data-cancel-sky>Cancel</button></p></div>
       <p class="sky-status" data-sky-status aria-live="polite"></p>
       <section class="house-resonance" data-house-resonance hidden></section>
       <section class="reading-folio" data-reading-folio hidden></section>
@@ -542,7 +545,7 @@ function renderReadingFolio() {
     <section class="synthesis-gate"><div class="folio-heading"><span>05</span><h4>Synthesis</h4><small>${synthesis.evidence.length} primary threads</small></div>
       <div class="synthesis-threshold"><p>The following transmission is composed from the strongest measured relationships in this chart and the canonical offices they activate. It is offered as a mirror. Keep what brings recognition; leave what does not.</p><button data-receive-synthesis>Receive the synthesis <span>↓</span></button></div>
       <div class="transmission" data-transmission hidden><span>Transmission</span>${synthesis.passages.map(passage => `<p>${escapeHtml(passage)}</p>`).join('')}<blockquote>What is measured creates the vessel. What is recognized remains yours to name.</blockquote><details><summary>Open the evidence record</summary>${synthesis.evidence.map(item => `<p><b>${item.score}</b><span>${escapeHtml(item.measurement)}</span></p>`).join('')}</details></div>
-    </section>`
+    </section><button class="export-record" data-export-record>Export technical record <span>JSON ↓</span></button>`
   folio.hidden = false
   folio.querySelectorAll('[data-folio-seat]').forEach(button => button.addEventListener('click', () => {
     selectGlyph(Number(button.dataset.folioSeat))
@@ -565,6 +568,13 @@ function renderReadingFolio() {
     transmission.hidden = false
     buttonEvent.currentTarget.setAttribute('aria-expanded', 'true')
     transmission.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })
+  })
+  folio.querySelector('[data-export-record]').addEventListener('click', () => {
+    const record = technicalRecord({ timestamp: state.skyTimestamp, mode: state.skyMode, placements: state.skyPlacements, planets: state.majorPlacements, angles: state.chartAngles, houses: state.houses, angleConfidence: state.angleConfidence })
+    const url = URL.createObjectURL(new Blob([JSON.stringify(record, null, 2)], { type: 'application/json' }))
+    const anchor = Object.assign(document.createElement('a'), { href: url, download: `celestial-glyphs-${state.skyTimestamp.slice(0, 10)}.json` })
+    anchor.click()
+    URL.revokeObjectURL(url)
   })
 }
 
@@ -595,19 +605,28 @@ async function calculateSky(event) {
   const status = document.querySelector('[data-sky-status]')
   status.textContent = 'Opening the ephemeris · 96 glyph bodies + 10 planetary points'
   event.currentTarget.querySelector('button[type="submit"]').disabled = true
+  const progress = document.querySelector('[data-calculation-progress]')
+  progress.hidden = false
+  state.skyController?.abort()
+  state.skyController = new AbortController()
   try {
-    const response = await fetch('/api/ephemeris', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ timestamp: moment.toISOString(), bodies: [...uniqueMeasuredBodies(glyphs), ...MAJOR_BODIES] }),
-    })
-    const result = await response.json()
-    if (!response.ok) throw new Error(result.error || 'The ephemeris could not be opened.')
-    state.skyPlacements = placementsBySeat(result.placements, glyphs)
-    state.majorPlacements = result.placements.filter(placement => MAJOR_BODIES.some(body => body.command === placement.command))
+    const bodies = [...uniqueMeasuredBodies(glyphs), ...MAJOR_BODIES]
     state.chartAngles = angles
     state.houses = houses
     state.angleConfidence = kind === 'birth' ? confidence : null
+    const result = await fetchEphemerisInBatches({
+      timestamp: moment.toISOString(), bodies, signal: state.skyController.signal,
+      onProgress: partial => {
+        state.skyPlacements = placementsBySeat(partial.placements, glyphs)
+        state.majorPlacements = partial.placements.filter(placement => MAJOR_BODIES.some(body => body.command === placement.command))
+        document.querySelector('[data-progress-count]').textContent = `${partial.completed} / ${partial.total}`
+        document.querySelector('[data-progress-bar]').style.width = `${partial.completed / partial.total * 100}%`
+        status.textContent = `Receiving the ephemeris · ${partial.completed} of ${partial.total} bodies · partial field visible`
+        renderMandala()
+      },
+    })
+    state.skyPlacements = placementsBySeat(result.placements, glyphs)
+    state.majorPlacements = result.placements.filter(placement => MAJOR_BODIES.some(body => body.command === placement.command))
     state.skyTimestamp = result.timestamp
     state.skyMode = kind
     state.skyHighlight = null
@@ -631,9 +650,11 @@ async function calculateSky(event) {
     renderDetail()
     updateModeCopy()
   } catch (error) {
-    status.textContent = error.message
+    status.textContent = error.name === 'AbortError' ? 'Calculation cancelled · received placements remain visible and cached' : error.message
   } finally {
     event.currentTarget.querySelector('button[type="submit"]').disabled = false
+    progress.hidden = true
+    state.skyController = null
   }
 }
 
@@ -649,6 +670,18 @@ document.querySelector('[data-sky-open]').addEventListener('click', () => toggle
 document.querySelector('[data-sky-close]').addEventListener('click', () => toggleSkyDrawer(false))
 document.querySelectorAll('[data-sky-kind]').forEach(button => button.addEventListener('click', () => setSkyKind(button.dataset.skyKind)))
 document.querySelector('[data-sky-form]').addEventListener('submit', calculateSky)
+document.querySelector('[data-cancel-sky]').addEventListener('click', () => state.skyController?.abort())
+document.querySelector('[data-reference-chart]').addEventListener('click', () => {
+  setSkyKind('birth')
+  const form = document.querySelector('[data-sky-form]')
+  form.elements.moment.value = '2000-01-01T12:00'
+  form.elements.confidence.value = 'exact'
+  form.elements.place.value = 'Greenwich J2000 reference'
+  form.elements.latitude.value = '0'
+  form.elements.longitude.value = '0'
+  form.elements.timezone.value = 'UTC'
+  document.querySelector('[data-sky-status]').textContent = 'Synthetic public reference loaded · submit when ready'
+})
 setSkyKind('live')
 
 document.querySelector('#glyph-search').addEventListener('input', event => {
