@@ -4,7 +4,7 @@ import { GROUPS, CHORDS, parseCodex, seamCounterpart, chordDestinations, adjacen
 import { placementsBySeat, uniqueMeasuredBodies, zodiacLabel } from './sky.js'
 import { chartAngles, houseForLongitude, lineageHouseResonance, MAJOR_BODIES, wholeSignHouses, zonedDateTime } from './chart.js'
 import { conjunction } from './astrology.js'
-import { angleContacts, planetaryCourts, populatedCourts } from './reading.js'
+import { angleContacts, densestCluster, planetaryCourts, populatedCourts, strongestChords } from './reading.js'
 
 const COLORS = [
   '#748c83', '#7893a3', '#9a7892', '#a45743', '#c29854',
@@ -35,6 +35,7 @@ const state = {
   chartAngles: null,
   angleConfidence: null,
   houses: null,
+  skyHighlight: null,
   skyStatus: '',
 }
 
@@ -241,7 +242,14 @@ function skyLayer(selected) {
     const label = polar(353, -75 + house.cusp)
     return `<g class="house-mark"><line x1="${inner.x}" y1="${inner.y}" x2="${outer.x}" y2="${outer.y}"/><text x="${label.x}" y="${label.y}">${house.house}</text></g>`
   }).join('') : ''
-  return `<g class="zodiac-register">${ticks}${labels}${houses}${angles}</g><g class="sky-points">${points}${planets}${bridge}</g>`
+  const highlight = state.skyHighlight?.type === 'cluster'
+    ? `<path class="cluster-wash" d="${ringPath(365, 399, -90 + state.skyHighlight.center - state.skyHighlight.span / 2, -90 + state.skyHighlight.center + state.skyHighlight.span / 2)}"/>`
+    : state.skyHighlight?.type === 'chord' ? (() => {
+      const first = polar(370, -90 + state.skyHighlight.first.longitude)
+      const second = polar(370, -90 + state.skyHighlight.second.longitude)
+      return `<path class="measured-chord measured-chord--${state.skyHighlight.aspect.toLowerCase()}" d="M ${first.x} ${first.y} Q 410 410 ${second.x} ${second.y}"/>`
+    })() : ''
+  return `<g class="zodiac-register">${highlight}${ticks}${labels}${houses}${angles}</g><g class="sky-points">${points}${planets}${bridge}</g>`
 }
 
 function renderMandala() {
@@ -483,6 +491,12 @@ function renderReadingFolio() {
   const populated = populatedCourts(courts)
   const angles = angleContacts(glyphs, state.skyPlacements, state.chartAngles, state.angleConfidence)
   const silentCourts = courts.filter(court => !court.contacts.length && court.planet)
+  const cluster = densestCluster(glyphs, state.skyPlacements)
+  const uniqueGlyphPoints = [...new Map([...state.skyPlacements.values()].map(placement => [placement.command, { ...placement, id: placement.command, kind: 'glyph', label: placement.name }])).values()]
+  const planetPoints = state.majorPlacements.map(placement => ({ ...placement, id: `planet:${placement.command}`, kind: 'planet', label: MAJOR_BODIES.find(body => body.command === placement.command)?.name || placement.name }))
+  const anglePoints = state.chartAngles ? Object.entries({ Ascendant: state.chartAngles.ascendant, Midheaven: state.chartAngles.midheaven, Descendant: state.chartAngles.descendant, 'Imum Coeli': state.chartAngles.imumCoeli }).map(([label, longitude]) => ({ id: `angle:${label}`, kind: 'angle', label, longitude })) : []
+  const chords = strongestChords([...uniqueGlyphPoints, ...planetPoints, ...anglePoints])
+  const chordFamilies = ['Step', 'Gift', 'Vow', 'Spiral', 'Mirror']
   const isNatal = state.skyMode === 'birth'
   folio.innerHTML = `<header><span>${isNatal ? 'Natal' : 'Live'} result folio</span><h3>Measured correspondences</h3><p>Measurement and canonical interpretation remain separate registers.</p></header>
     <section><div class="folio-heading"><span>01</span><h4>Planetary courts</h4><small>${populated.length} populated</small></div>
@@ -491,10 +505,31 @@ function renderReadingFolio() {
     </section>
     <section><div class="folio-heading"><span>02</span><h4>The four angles</h4><small>${angles.length ? state.angleConfidence : 'unavailable'}</small></div>
       ${angles.length ? angles.map(angle => `<article class="angle-record${angle.confidence === 'approximate' ? ' is-approximate' : ''}"><h5>${angle.label} <small>${zodiacLabel(angle.longitude)} · ${angle.confidence}</small></h5>${angle.contacts.length ? contactRows(angle.contacts) : '<p class="folio-silence">No glyph within 3° · measured silence</p>'}</article>`).join('') : `<p class="folio-silence">${isNatal ? 'Birth time unknown: angle claims are suppressed.' : 'Angles belong to a located chart and are not inferred for the geocentric live field.'}</p>`}
+    </section>
+    <section><div class="folio-heading"><span>03</span><h4>The densest gathering</h4><small>${cluster?.members.length || 0} bodies</small></div>
+      ${cluster ? `<article class="cluster-record"><h5>${zodiacLabel(cluster.center)} <small>${cluster.span.toFixed(3)}° span · ${cluster.countingRule}</small></h5><p>${cluster.members.map(member => escapeHtml(member.name)).join(' · ')}</p><p class="cluster-seats">Canonical seats ${cluster.seats.map(seat => String(seat).padStart(3, '0')).join(' · ')}</p><button class="folio-reveal" data-reveal-cluster>Reveal gathering on wheel <span>↗</span></button></article>` : '<p class="folio-silence">No measured glyph field available.</p>'}
+    </section>
+    <section><div class="folio-heading"><span>04</span><h4>The chord lattice</h4><small>strongest by family</small></div>
+      ${chordFamilies.map(family => {
+        const familyChords = chords.get(family) || []
+        return `<article class="chord-family"><h5>${family} <small>${familyChords.length ? `${familyChords.length} strongest` : 'silent'}</small></h5>${familyChords.length ? familyChords.map((chord, index) => `<button data-reveal-chord="${family}:${index}"><span><b>${escapeHtml(chord.first.label)} ↔ ${escapeHtml(chord.second.label)}</b><small>${chord.separation.toFixed(3)}° separation · orb ${chord.orb.toFixed(3)}°</small></span><em>${chord.tier}</em></button>`).join('') : '<p class="folio-silence">No chord within 2° of this family.</p>'}</article>`
+      }).join('')}
     </section>`
   folio.hidden = false
   folio.querySelectorAll('[data-folio-seat]').forEach(button => button.addEventListener('click', () => {
     selectGlyph(Number(button.dataset.folioSeat))
+    toggleSkyDrawer(false)
+  }))
+  folio.querySelector('[data-reveal-cluster]')?.addEventListener('click', () => {
+    state.skyHighlight = { type: 'cluster', center: cluster.center, span: Math.max(cluster.span, .8) }
+    renderMandala()
+    toggleSkyDrawer(false)
+  })
+  folio.querySelectorAll('[data-reveal-chord]').forEach(button => button.addEventListener('click', () => {
+    const [family, index] = button.dataset.revealChord.split(':')
+    const chord = chords.get(family)[Number(index)]
+    state.skyHighlight = { type: 'chord', aspect: chord.aspect, first: chord.first, second: chord.second }
+    renderMandala()
     toggleSkyDrawer(false)
   }))
 }
@@ -541,6 +576,7 @@ async function calculateSky(event) {
     state.angleConfidence = kind === 'birth' ? confidence : null
     state.skyTimestamp = result.timestamp
     state.skyMode = kind
+    state.skyHighlight = null
     const angleStatus = kind === 'birth' ? (angles ? ` · Whole Sign houses · angles ${confidence}` : ' · houses and angles suppressed') : ''
     status.textContent = `${state.skyPlacements.size} seats + ${state.majorPlacements.length} planets measured${angleStatus} · NASA/JPL Horizons`
     const resonancePanel = document.querySelector('[data-house-resonance]')

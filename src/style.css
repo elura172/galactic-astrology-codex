@@ -370,6 +370,13 @@ input:focus-visible,
 .angle-mark.is-approximate { stroke-dasharray: 2 3; opacity: .55; }
 .house-mark { stroke: rgba(182,139,58,.62); stroke-width: .8; }
 .house-mark text { fill: var(--gold); stroke: none; font: 6px var(--mono); text-anchor: middle; }
+.cluster-wash { fill: rgba(164,99,112,.2); stroke: var(--rose); stroke-width: .8; }
+.measured-chord { fill: none; stroke: var(--gold); stroke-width: 1.6; vector-effect: non-scaling-stroke; }
+.measured-chord--step { stroke-width: 1; }
+.measured-chord--gift { stroke: var(--blue); }
+.measured-chord--vow { stroke: var(--gold); stroke-width: 2; }
+.measured-chord--spiral { stroke-dasharray: 5 4; }
+.measured-chord--mirror { stroke: var(--rose); stroke-width: 2.2; }
 
 .plot-readout { position: absolute; left: 25px; bottom: 20px; width: 8px; height: 8px; overflow: hidden; clip-path: inset(50%); }
 
@@ -477,6 +484,11 @@ input:focus-visible,
 .reading-folio article button em { font: italic 11px/1.35 var(--serif); }
 .folio-silence { margin: 0; padding: 12px 25px; color: var(--quiet); font: italic 11px/1.45 var(--serif); }
 .folio-silence b { color: var(--ink); font: 7px var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+.cluster-record > p { margin: 8px 0; font: 13px/1.45 var(--serif); }
+.cluster-record .cluster-seats { color: var(--quiet); font: 7px/1.6 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.folio-reveal { display: flex !important; grid-template-columns: none !important; justify-content: space-between; margin-top: 10px; padding: 10px !important; border: 1px solid var(--ink) !important; font: 7px var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+.chord-family > .folio-silence { padding: 5px 0; }
+.chord-family article button em, .chord-family button em { align-self: center; color: var(--quiet); font: 7px var(--mono); text-align: right; text-transform: uppercase; }
 .measured-sky { margin: 18px 0; padding: 12px 0; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); }
 .measured-sky > span { color: var(--quiet); font: 7px var(--mono); letter-spacing: .15em; text-transform: uppercase; }
 .measured-sky p { display: flex; justify-content: space-between; gap: 10px; margin: 9px 0; font: 14px var(--serif); }
