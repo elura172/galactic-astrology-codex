@@ -1,6 +1,6 @@
 import './style.css'
 import codexMarkdown from '../codex_of_celestial_glyphs.md?raw'
-import { GROUPS, CHORDS, parseCodex, seamCounterpart, chordDestinations, adjacentFaces, relatedGlyphNumbers } from './codex.js'
+import { GROUPS, CHORDS, parseCodex, seamCounterpart, chordDestinations, adjacentFaces, relatedGlyphNumbers, classifiedRelationships } from './codex.js'
 
 const COLORS = [
   '#748c83', '#7893a3', '#9a7892', '#a45743', '#c29854',
@@ -145,8 +145,33 @@ function chordLines(selected) {
   }).join('')
 }
 
+function relationshipPath(source, target, index) {
+  const midpoint = { x: (source.x + target.x) / 2, y: (source.y + target.y) / 2 }
+  const inward = 0.22 + (index % 3) * 0.045
+  const control = {
+    x: midpoint.x + (410 - midpoint.x) * inward,
+    y: midpoint.y + (410 - midpoint.y) * inward,
+  }
+  return `M ${source.x} ${source.y} Q ${control.x} ${control.y} ${target.x} ${target.y}`
+}
+
+function chamberRelationships(selected) {
+  if (!state.chamber) return ''
+  const source = nodePosition(selected)
+  return classifiedRelationships(selected, glyphs).map((relationship, index) => {
+    const target = nodePosition(relationship.target)
+    return `<g class="relationship relationship--${relationship.type}">
+      <path d="${relationshipPath(source, target, index)}" />
+      <circle cx="${target.x}" cy="${target.y}" r="11" />
+      <title>${escapeHtml(relationship.label)} to seat ${relationship.target.number}, ${escapeHtml(relationship.target.name)}</title>
+    </g>`
+  }).join('')
+}
+
 function renderMandala() {
   const selected = glyphByNumber.get(state.selected)
+  const chamberRelated = state.chamber ? classifiedRelationships(selected, glyphs) : []
+  const chamberRelatedNumbers = new Set(chamberRelated.map(relationship => relationship.target.number))
   const sectorOpacity = state.mode === 'faces' ? 0.2 : 0.08
   const sectors = GROUPS.slice(0, 10).map((group, index) => `
     <path class="face-sector" data-group="${index}" d="${ringPath(218, 344, -106 + index * 36, -74 + index * 36)}"
@@ -162,8 +187,10 @@ function renderMandala() {
   const nodes = glyphs.map(glyph => {
     const position = nodePosition(glyph)
     const selectedClass = glyph.number === state.selected ? ' is-selected' : ''
-    const mutedClass = state.mode === 'faces' && glyph.groupIndex !== selected.groupIndex ? ' is-muted' : ''
-    return `<g class="seat${selectedClass}${mutedClass}" data-seat="${glyph.number}" tabindex="0" role="button" aria-label="Seat ${glyph.number}, ${escapeHtml(glyph.name)}">
+    const chamberRelationship = chamberRelatedNumbers.has(glyph.number)
+    const mutedClass = (state.mode === 'faces' && glyph.groupIndex !== selected.groupIndex) || (state.chamber && !chamberRelationship && glyph.number !== selected.number) ? ' is-muted' : ''
+    const relatedClass = chamberRelationship ? ' is-related' : ''
+    return `<g class="seat${selectedClass}${relatedClass}${mutedClass}" data-seat="${glyph.number}" tabindex="0" role="button" aria-label="Seat ${glyph.number}, ${escapeHtml(glyph.name)}${chamberRelationship ? ', related to selected seat' : ''}">
       <circle class="seat__hit" cx="${position.x}" cy="${position.y}" r="15" />
       ${glyph.seam ? `<circle class="seat__seam" cx="${position.x}" cy="${position.y}" r="9" />` : ''}
       <circle class="seat__dot ${glyph.invoked ? 'seat__dot--invoked' : ''}" cx="${position.x}" cy="${position.y}" r="${glyph.number === state.selected ? 7 : 4.2}" fill="${glyph.invoked ? '#a46370' : COLORS[glyph.groupIndex]}" />
@@ -177,6 +204,7 @@ function renderMandala() {
     </defs>
     <g class="geometry">${sectors}<polygon points="${polygonPoints(10, 217)}"/><polygon class="geometry__inner" points="${polygonPoints(5, 194)}"/><circle cx="410" cy="410" r="184"/><circle cx="410" cy="410" r="126"/></g>
     <g class="chord-layer">${chordLines(selected)}</g>
+    <g class="relationship-layer" aria-hidden="true">${chamberRelationships(selected)}</g>
     <g class="labels">${labels}
       <text class="axis-label" x="410" y="292">NADIR · GALACTIC CORE</text>
       <text class="axis-label" x="410" y="231">ZENITH · POLARIS</text>
@@ -326,6 +354,7 @@ function toggleChamber() {
   document.body.classList.toggle('is-chamber', state.chamber)
   document.querySelector('[data-chamber]').setAttribute('aria-pressed', String(state.chamber))
   document.querySelector('[data-footer-nav]').textContent = state.chamber ? '← → move through related glyphs · Esc exits' : '← → move between seats'
+  renderMandala()
   renderDetail()
 }
 

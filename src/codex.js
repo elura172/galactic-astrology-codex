@@ -92,3 +92,23 @@ export function relatedGlyphNumbers(glyph, glyphs) {
   ]
   return [...new Set(candidates.filter(number => number && number !== glyph.number))]
 }
+
+export function classifiedRelationships(glyph, glyphs) {
+  const glyphByNumber = new Map(glyphs.map(candidate => [candidate.number, candidate]))
+  const counterpart = seamCounterpart(glyph, glyphs)
+  const relationships = [
+    ...(counterpart ? [{ type: 'seam', label: 'Nine Seam', target: counterpart }] : []),
+    ...adjacentFaces(glyph).map(face => ({
+      type: glyph.groupIndex > 9 ? 'course' : 'face',
+      label: face.relation,
+      target: glyphByNumber.get(face.number),
+    })),
+    ...chordDestinations(glyph, glyphByNumber).map(({ chord, target }) => ({
+      type: `chord-${chord.className}`,
+      label: `${chord.name} ${chord.angle}`,
+      target,
+    })),
+  ]
+
+  return relationships.filter(relationship => relationship.target)
+}

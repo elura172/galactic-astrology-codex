@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { parseCodex, seamCounterpart, chordDestinations, adjacentFaces, relatedGlyphNumbers } from '../src/codex.js'
+import { parseCodex, seamCounterpart, chordDestinations, adjacentFaces, relatedGlyphNumbers, classifiedRelationships } from '../src/codex.js'
 
 const markdown = readFileSync(fileURLToPath(new URL('../codex_of_celestial_glyphs.md', import.meta.url)), 'utf8')
 const glyphs = parseCodex(markdown)
@@ -56,4 +56,12 @@ test('builds an ordered, unique related-glyph ring', () => {
   assert.equal(new Set(related).size, related.length)
   assert.ok(!related.includes(1))
   assert.deepEqual(relatedGlyphNumbers(byNumber.get(91), glyphs), [1, 19, 28, 55, 82])
+})
+
+test('classifies chamber relationships without duplicating canonical targets', () => {
+  const seamTypes = classifiedRelationships(byNumber.get(1), glyphs)
+  assert.equal(seamTypes.filter(item => item.type === 'seam').length, 1)
+  assert.equal(seamTypes.filter(item => item.type === 'face').length, 2)
+  assert.equal(seamTypes.filter(item => item.type.startsWith('chord-')).length, 5)
+  assert.deepEqual(classifiedRelationships(byNumber.get(91), glyphs).map(item => item.type), Array(5).fill('course'))
 })

@@ -339,6 +339,19 @@ input:focus-visible,
 .chord--mirror { stroke-width: 2.5; opacity: 0.34; }
 @keyframes drawChord { from { stroke-dashoffset: 900; } to { stroke-dashoffset: 0; } }
 
+.relationship-layer { pointer-events: none; }
+.relationship { fill: none; stroke: rgba(231,223,202,.58); stroke-width: 1.1; }
+.relationship path { vector-effect: non-scaling-stroke; stroke-dasharray: 900; animation: drawChord 720ms cubic-bezier(.2,.7,.2,1) both; }
+.relationship circle { fill: none; stroke: inherit; stroke-width: .8; opacity: .55; }
+.relationship--seam { stroke: #bd7785; stroke-width: 1.8; }
+.relationship--seam path { stroke-dasharray: 3 3; }
+.relationship--face, .relationship--course { stroke: #82a3ad; }
+.relationship--course path { stroke-dasharray: 8 3 2 3; }
+.relationship--chord-gift { stroke-width: 1.6; }
+.relationship--chord-vow { stroke: #c4a35f; stroke-width: 1.8; }
+.relationship--chord-spiral path { stroke-dasharray: 5 4; }
+.relationship--chord-mirror { stroke-width: 2.2; opacity: .68; }
+
 .plot-readout { position: absolute; left: 25px; bottom: 20px; width: 8px; height: 8px; overflow: hidden; clip-path: inset(50%); }
 
 .detail-card { min-height: 100%; padding: 22px; background: rgba(255,255,255,0.11); }
@@ -405,7 +418,13 @@ input:focus-visible,
 .is-chamber .plot-heading { opacity: 0.3; }
 .is-chamber .mandala { transform: scale(1.22); filter: grayscale(.65); transition: transform 850ms cubic-bezier(.2,.8,.2,1), filter 850ms; }
 .is-chamber .geometry { stroke: rgba(231,223,202,.18); }
+.is-chamber .face-sector { fill-opacity: .025; }
 .is-chamber .group-label, .is-chamber .axis-label, .is-chamber .seat__number { fill: rgba(231,223,202,.5); }
+.is-chamber .seat { opacity: .14; transition: opacity 320ms ease; }
+.is-chamber .seat.is-related { opacity: .9; }
+.is-chamber .seat.is-selected { opacity: 1; }
+.is-chamber .seat.is-related .seat__dot { stroke: rgba(231,223,202,.8); stroke-width: 1.5; }
+.is-chamber .seat.is-related .seat__number { opacity: 1; }
 .is-chamber .center-seal circle { fill: var(--astral); stroke: rgba(231,223,202,.55); }
 .is-chamber .center-seal text { fill: #eee9dd; }
 .is-chamber .detail-card { color: var(--ink); background: var(--paper); box-shadow: -35px 0 90px rgba(0,0,0,.46); transform: scale(1.015); transform-origin: right center; transition: transform 700ms; }
