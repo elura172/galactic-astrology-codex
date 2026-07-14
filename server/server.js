@@ -26,9 +26,9 @@ async function requestBody(request) {
 function validate(body) {
   const timestamp = new Date(body.timestamp)
   if (!Number.isFinite(timestamp.getTime())) throw new Error('A valid ISO timestamp is required.')
-  if (!Array.isArray(body.bodies) || !body.bodies.length || body.bodies.length > 100) throw new Error('Supply between 1 and 100 bodies.')
+  if (!Array.isArray(body.bodies) || !body.bodies.length || body.bodies.length > 110) throw new Error('Supply between 1 and 110 bodies.')
   body.bodies.forEach(item => {
-    if (!/^\d+;$/.test(item.command)) throw new Error('Every body requires a numeric Horizons small-body command.')
+    if (!/^\d+;?$/.test(item.command)) throw new Error('Every body requires a numeric Horizons command.')
   })
   return { timestamp: timestamp.toISOString(), bodies: body.bodies }
 }

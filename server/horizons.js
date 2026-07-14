@@ -9,7 +9,7 @@ export function julianDate(value) {
 }
 
 export function horizonsUrl(command, timestamp) {
-  if (!/^\d+;$/.test(command)) throw new TypeError('Horizons small-body command must be a number followed by a semicolon.')
+  if (!/^\d+;?$/.test(command)) throw new TypeError('Horizons command must be a numeric major-body ID or small-body number followed by a semicolon.')
   const parameters = new URLSearchParams({
     format: 'json', COMMAND: `'${command}'`, OBJ_DATA: 'NO', MAKE_EPHEM: 'YES',
     EPHEM_TYPE: 'OBSERVER', CENTER: "'500@399'", TLIST: `'${julianDate(timestamp).toFixed(8)}'`,

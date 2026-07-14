@@ -8,6 +8,7 @@ test('converts ISO instants to Julian dates and constructs constrained queries',
   assert.equal(url.searchParams.get('COMMAND'), "'1;'")
   assert.equal(url.searchParams.get('CENTER'), "'500@399'")
   assert.equal(url.searchParams.get('QUANTITIES'), "'31'")
+  assert.equal(new URL(horizonsUrl('10', '2000-01-01T12:00:00.000Z')).searchParams.get('COMMAND'), "'10'")
   assert.throws(() => horizonsUrl('Ceres', '2000-01-01T12:00:00.000Z'))
 })
 

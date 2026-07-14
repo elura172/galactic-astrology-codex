@@ -2,6 +2,8 @@ import './style.css'
 import codexMarkdown from '../codex_of_celestial_glyphs.md?raw'
 import { GROUPS, CHORDS, parseCodex, seamCounterpart, chordDestinations, adjacentFaces, relatedGlyphNumbers, classifiedRelationships } from './codex.js'
 import { placementsBySeat, uniqueMeasuredBodies, zodiacLabel } from './sky.js'
+import { chartAngles, MAJOR_BODIES, zonedDateTime } from './chart.js'
+import { conjunction } from './astrology.js'
 
 const COLORS = [
   '#748c83', '#7893a3', '#9a7892', '#a45743', '#c29854',
@@ -28,6 +30,9 @@ const state = {
   skyMode: null,
   skyTimestamp: null,
   skyPlacements: new Map(),
+  majorPlacements: [],
+  chartAngles: null,
+  angleConfidence: null,
   skyStatus: '',
 }
 
@@ -101,8 +106,10 @@ app.innerHTML = `
       <label>Moment in local time<input type="datetime-local" name="moment" required></label>
       <div class="birth-fields" data-birth-fields hidden>
         <label>Time confidence<select name="confidence"><option value="exact">Exact</option><option value="approximate">Approximate</option><option value="unknown">Unknown</option></select></label>
-        <label>Birthplace<input name="place" autocomplete="off" placeholder="City, country"></label>
-        <p>Place remains in this browser. Angles and houses stay disabled until coordinates and timezone are explicitly confirmed.</p>
+        <label>Birthplace note <input name="place" autocomplete="off" placeholder="City, country · optional local note"></label>
+        <div class="coordinate-fields"><label>Latitude<input name="latitude" type="number" min="-90" max="90" step="any" placeholder="43.6532"></label><label>Longitude<input name="longitude" type="number" min="-180" max="180" step="any" placeholder="-79.3832"></label></div>
+        <label>Confirmed timezone<input name="timezone" placeholder="America/Toronto" autocomplete="off"></label>
+        <p>Coordinates and timezone are confirmed directly; the birthplace text remains local and is never sent to a geocoder.</p>
       </div>
       <div class="sky-privacy"><i>◇</i><p><b>Transient by design</b>Nothing entered here is saved. The ephemeris service receives only the selected instant and canonical body identifiers.</p></div>
       <button class="sky-calculate" type="submit">Calculate glyph field <span>→</span></button>
@@ -214,7 +221,17 @@ function skyLayer(selected) {
     const seat = nodePosition(selected)
     return `<path class="sky-bridge" d="M ${sky.x} ${sky.y} Q 410 410 ${seat.x} ${seat.y}" />`
   })() : ''
-  return `<g class="zodiac-register">${ticks}${labels}</g><g class="sky-points">${points}${bridge}</g>`
+  const planets = state.majorPlacements.map(placement => {
+    const point = polar(370, -90 + placement.longitude)
+    const body = MAJOR_BODIES.find(candidate => candidate.command === placement.command)
+    return `<g class="planet-point"><circle cx="${point.x}" cy="${point.y}" r="7"/><text x="${point.x}" y="${point.y + 3}">${body?.symbol || '·'}</text><title>${body?.name || placement.name} · ${zodiacLabel(placement.longitude)}</title></g>`
+  }).join('')
+  const angles = state.chartAngles ? Object.entries({ ASC: state.chartAngles.ascendant, MC: state.chartAngles.midheaven, DSC: state.chartAngles.descendant, IC: state.chartAngles.imumCoeli }).map(([label, longitude]) => {
+    const outer = polar(399, -90 + longitude)
+    const inner = polar(375, -90 + longitude)
+    return `<g class="angle-mark${state.angleConfidence === 'approximate' ? ' is-approximate' : ''}"><line x1="${inner.x}" y1="${inner.y}" x2="${outer.x}" y2="${outer.y}"/><text x="${outer.x}" y="${outer.y}">${label}</text></g>`
+  }).join('') : ''
+  return `<g class="zodiac-register">${ticks}${labels}${angles}</g><g class="sky-points">${points}${planets}${bridge}</g>`
 }
 
 function renderMandala() {
@@ -291,6 +308,17 @@ function renderDetail() {
   const adjacent = adjacentFaces(glyph)
   const chords = chordDestinations(glyph, glyphByNumber)
   const relatedAnchor = glyphByNumber.get(state.relatedAnchor)
+  const measured = state.skyPlacements.get(glyph.number)
+  const planetContacts = measured ? state.majorPlacements.flatMap(placement => {
+    const contact = conjunction(measured.longitude, placement.longitude)
+    const body = MAJOR_BODIES.find(candidate => candidate.command === placement.command)
+    return contact ? [{ ...contact, body, placement }] : []
+  }) : []
+  const skyReading = measured ? `<section class="measured-sky">
+    <span>Measured sky · ${state.skyMode === 'birth' ? 'Natal field' : 'Live field'}</span>
+    <p><b>${zodiacLabel(measured.longitude)}</b><small>Latitude ${measured.latitude.toFixed(3)}° · NASA/JPL Horizons</small></p>
+    ${planetContacts.length ? `<div>${planetContacts.map(contact => `<p><b>${contact.body.symbol} ${contact.body.name}</b><small>${contact.tier} conjunction · orb ${contact.orb.toFixed(3)}°</small></p>`).join('')}</div>` : '<em>No planetary conjunction within 3° · a measured silence</em>'}
+  </section>` : ''
   const chamberPanel = state.chamber ? `
     <section class="chamber-panel" aria-label="Canonical relationships">
       <div class="chamber-panel__heading">
@@ -344,6 +372,7 @@ function renderDetail() {
         ${glyph.seam ? '<span>◆ Nine Seam</span>' : ''}
         ${glyph.invoked ? '<span>✦ Invoked Presence</span>' : '<span>○ Catalogue Seat</span>'}
       </div>
+      ${skyReading}
       ${chamberPanel}
       <button class="chamber-key" data-detail-chamber>${state.chamber ? 'Return to instrument' : 'Enter this chamber'} <span>↗</span></button>
     </div>
@@ -433,25 +462,47 @@ function setSkyKind(kind) {
 async function calculateSky(event) {
   event.preventDefault()
   const form = new FormData(event.currentTarget)
-  const moment = new Date(form.get('moment'))
-  if (!Number.isFinite(moment.getTime())) return
+  const kind = skyDrawer.dataset.kind || 'live'
+  const confidence = form.get('confidence')
+  let moment
+  let angles = null
+  try {
+    if (kind === 'birth') {
+      moment = zonedDateTime(form.get('moment'), form.get('timezone'))
+      if (confidence !== 'unknown') {
+        if (form.get('latitude') === '' || form.get('longitude') === '') throw new Error('Confirmed coordinates are required for chart angles.')
+        angles = chartAngles(moment, Number(form.get('latitude')), Number(form.get('longitude')))
+      }
+    } else {
+      moment = new Date(form.get('moment'))
+    }
+    if (!Number.isFinite(moment.getTime())) throw new Error('Enter a valid moment.')
+  } catch (error) {
+    document.querySelector('[data-sky-status]').textContent = error.message
+    return
+  }
   const status = document.querySelector('[data-sky-status]')
-  status.textContent = 'Opening the ephemeris · 96 measured bodies'
+  status.textContent = 'Opening the ephemeris · 96 glyph bodies + 10 planetary points'
   event.currentTarget.querySelector('button[type="submit"]').disabled = true
   try {
     const response = await fetch('/api/ephemeris', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ timestamp: moment.toISOString(), bodies: uniqueMeasuredBodies(glyphs) }),
+      body: JSON.stringify({ timestamp: moment.toISOString(), bodies: [...uniqueMeasuredBodies(glyphs), ...MAJOR_BODIES] }),
     })
     const result = await response.json()
     if (!response.ok) throw new Error(result.error || 'The ephemeris could not be opened.')
     state.skyPlacements = placementsBySeat(result.placements, glyphs)
+    state.majorPlacements = result.placements.filter(placement => MAJOR_BODIES.some(body => body.command === placement.command))
+    state.chartAngles = angles
+    state.angleConfidence = kind === 'birth' ? confidence : null
     state.skyTimestamp = result.timestamp
-    state.skyMode = skyDrawer.dataset.kind || 'live'
-    status.textContent = `${state.skyPlacements.size} seats measured · NASA/JPL Horizons`
+    state.skyMode = kind
+    const angleStatus = kind === 'birth' ? (angles ? ` · angles ${confidence}` : ' · angles suppressed') : ''
+    status.textContent = `${state.skyPlacements.size} seats + ${state.majorPlacements.length} planets measured${angleStatus} · NASA/JPL Horizons`
     document.body.classList.add('has-sky')
     renderMandala()
+    renderDetail()
     updateModeCopy()
   } catch (error) {
     status.textContent = error.message
