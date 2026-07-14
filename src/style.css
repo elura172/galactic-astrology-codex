@@ -524,7 +524,9 @@ input:focus-visible,
 .transmission details p { display: grid; grid-template-columns: 28px 1fr; gap: 8px; margin: 0; padding: 8px 0; border-top: 1px solid var(--rule); }
 .transmission details b { color: var(--quiet); font: 7px var(--mono); }
 .transmission details span { font: 10px/1.4 var(--sans); }
-.export-record { display: flex; justify-content: space-between; width: 100%; padding: 14px 25px; color: var(--quiet); border: 0; border-top: 1px solid var(--ink); background: transparent; font: 7px var(--mono); letter-spacing: .12em; text-transform: uppercase; cursor: pointer; }
+.folio-actions { border-top: 1px solid var(--ink); }
+.folio-actions button { display: flex; justify-content: space-between; width: 100%; padding: 14px 25px; color: var(--quiet); border: 0; background: transparent; font: 7px var(--mono); letter-spacing: .12em; text-transform: uppercase; cursor: pointer; }
+.folio-actions button + button { border-top: 1px solid var(--rule); }
 .measured-sky { margin: 18px 0; padding: 12px 0; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); }
 .measured-sky > span { color: var(--quiet); font: 7px var(--mono); letter-spacing: .15em; text-transform: uppercase; }
 .measured-sky p { display: flex; justify-content: space-between; gap: 10px; margin: 9px 0; font: 14px var(--serif); }
@@ -533,6 +535,30 @@ input:focus-visible,
 .measured-sky em { display: block; margin-top: 9px; color: var(--quiet); font: italic 11px var(--serif); }
 .has-sky .sky-button { color: var(--paper); background: var(--ink); }
 .has-sky .sky-button b { color: var(--paper); border-color: var(--paper); }
+
+@media print {
+  @page { margin: 14mm; size: auto; }
+  body.is-printing-folio { color: #171512; background: #f4f0e6; }
+  body.is-printing-folio > :not(.sky-drawer) { display: none !important; }
+  body.is-printing-folio .sky-drawer { position: static; width: auto; height: auto; overflow: visible; padding: 0; border: 0; box-shadow: none; transform: none; visibility: visible; }
+  body.is-printing-folio .sky-drawer > :not(form),
+  body.is-printing-folio .sky-drawer form > :not(.reading-folio) { display: none !important; }
+  body.is-printing-folio .reading-folio { margin: 0; border: 1px solid #171512; }
+  body.is-printing-folio .folio-depth,
+  body.is-printing-folio .folio-index,
+  body.is-printing-folio .folio-actions,
+  body.is-printing-folio .folio-reveal,
+  body.is-printing-folio [data-receive-synthesis] { display: none !important; }
+  body.is-printing-folio [data-folio-seat],
+  body.is-printing-folio [data-reveal-chord] { color: inherit; pointer-events: none; }
+  body.is-printing-folio .reading-folio .folio-full,
+  body.is-printing-folio .reading-folio .essential-record { display: block !important; }
+  body.is-printing-folio .reading-folio header,
+  body.is-printing-folio .reading-folio section,
+  body.is-printing-folio .reading-folio article,
+  body.is-printing-folio .transmission { break-inside: avoid; }
+  body.is-printing-folio .transmission { animation: none; }
+}
 
 /* Astral chamber: the instrument recedes and the selected voice gains scale. */
 .is-chamber .instrument { color: #e8e4d9; background-color: var(--astral); background-image: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px); background-size: 80px 80px; }
