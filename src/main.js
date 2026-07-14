@@ -1,6 +1,7 @@
 import './style.css'
 import codexMarkdown from '../codex_of_celestial_glyphs.md?raw'
 import { GROUPS, CHORDS, parseCodex, seamCounterpart, chordDestinations, adjacentFaces, relatedGlyphNumbers, classifiedRelationships } from './codex.js'
+import { placementsBySeat, uniqueMeasuredBodies, zodiacLabel } from './sky.js'
 
 const COLORS = [
   '#748c83', '#7893a3', '#9a7892', '#a45743', '#c29854',
@@ -23,6 +24,11 @@ const state = {
   relatedCursor: -1,
   relatedRing: [],
   relatedAnchor: null,
+  skyOpen: false,
+  skyMode: null,
+  skyTimestamp: null,
+  skyPlacements: new Map(),
+  skyStatus: '',
 }
 
 const app = document.querySelector('#app')
@@ -50,6 +56,7 @@ app.innerHTML = `
       <button class="index-button" data-chamber aria-pressed="false">
         <span>Astral chamber</span><b>◫</b>
       </button>
+      <button class="sky-button" data-sky-open aria-expanded="false"><span>Set the sky</span><b>☉</b></button>
     </header>
 
     <section class="workbench">
@@ -87,6 +94,21 @@ app.innerHTML = `
       <span data-footer-state>Ring register active</span>
     </footer>
   </main>
+  <aside class="sky-drawer" data-sky-drawer aria-hidden="true">
+    <div class="sky-drawer__header"><div><span>Ephemeris layer</span><h2>Set the sky</h2></div><button data-sky-close aria-label="Close sky controls">×</button></div>
+    <div class="sky-kind" role="group" aria-label="Chart kind"><button class="is-active" data-sky-kind="live">Live sky</button><button data-sky-kind="birth">Birth chart</button></div>
+    <form data-sky-form>
+      <label>Moment in local time<input type="datetime-local" name="moment" required></label>
+      <div class="birth-fields" data-birth-fields hidden>
+        <label>Time confidence<select name="confidence"><option value="exact">Exact</option><option value="approximate">Approximate</option><option value="unknown">Unknown</option></select></label>
+        <label>Birthplace<input name="place" autocomplete="off" placeholder="City, country"></label>
+        <p>Place remains in this browser. Angles and houses stay disabled until coordinates and timezone are explicitly confirmed.</p>
+      </div>
+      <div class="sky-privacy"><i>◇</i><p><b>Transient by design</b>Nothing entered here is saved. The ephemeris service receives only the selected instant and canonical body identifiers.</p></div>
+      <button class="sky-calculate" type="submit">Calculate glyph field <span>→</span></button>
+      <p class="sky-status" data-sky-status aria-live="polite"></p>
+    </form>
+  </aside>
 `
 
 const instrument = document.querySelector('.instrument')
@@ -95,6 +117,7 @@ const mandala = document.querySelector('[data-mandala]')
 const detail = document.querySelector('[data-detail]')
 const live = document.querySelector('[data-live]')
 const results = document.querySelector('[data-results]')
+const skyDrawer = document.querySelector('[data-sky-drawer]')
 
 const escapeHtml = value => value.replace(/[&<>'"]/g, character => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
@@ -168,6 +191,32 @@ function chamberRelationships(selected) {
   }).join('')
 }
 
+function skyLayer(selected) {
+  if (!state.skyPlacements.size) return ''
+  const signs = ['ARI', 'TAU', 'GEM', 'CAN', 'LEO', 'VIR', 'LIB', 'SCO', 'SAG', 'CAP', 'AQU', 'PIS']
+  const ticks = Array.from({ length: 36 }, (_, index) => {
+    const outer = polar(394, -90 + index * 10)
+    const inner = polar(index % 3 === 0 ? 382 : 388, -90 + index * 10)
+    return `<line x1="${inner.x}" y1="${inner.y}" x2="${outer.x}" y2="${outer.y}" />`
+  }).join('')
+  const labels = signs.map((sign, index) => {
+    const point = polar(406, -75 + index * 30)
+    return `<text x="${point.x}" y="${point.y}">${sign}</text>`
+  }).join('')
+  const points = [...state.skyPlacements.entries()].map(([seat, placement]) => {
+    const point = polar(386, -90 + placement.longitude)
+    const active = seat === selected.number
+    return `<circle class="sky-point${active ? ' is-active' : ''}" data-sky-seat="${seat}" tabindex="0" role="button" aria-label="Seat ${seat}, ${escapeHtml(placement.name)}, ${zodiacLabel(placement.longitude)}" cx="${point.x}" cy="${point.y}" r="${active ? 4.8 : 1.8}"><title>Seat ${seat}, ${escapeHtml(placement.name)} · ${zodiacLabel(placement.longitude)}</title></circle>`
+  }).join('')
+  const activePlacement = state.skyPlacements.get(selected.number)
+  const bridge = activePlacement ? (() => {
+    const sky = polar(386, -90 + activePlacement.longitude)
+    const seat = nodePosition(selected)
+    return `<path class="sky-bridge" d="M ${sky.x} ${sky.y} Q 410 410 ${seat.x} ${seat.y}" />`
+  })() : ''
+  return `<g class="zodiac-register">${ticks}${labels}</g><g class="sky-points">${points}${bridge}</g>`
+}
+
 function renderMandala() {
   const selected = glyphByNumber.get(state.selected)
   const chamberRelated = state.chamber ? classifiedRelationships(selected, glyphs) : []
@@ -203,6 +252,7 @@ function renderMandala() {
       <filter id="ink"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="8" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="0.35"/></filter>
     </defs>
     <g class="geometry">${sectors}<polygon points="${polygonPoints(10, 217)}"/><polygon class="geometry__inner" points="${polygonPoints(5, 194)}"/><circle cx="410" cy="410" r="184"/><circle cx="410" cy="410" r="126"/></g>
+    <g class="sky-layer">${skyLayer(selected)}</g>
     <g class="chord-layer">${chordLines(selected)}</g>
     <g class="relationship-layer" aria-hidden="true">${chamberRelationships(selected)}</g>
     <g class="labels">${labels}
@@ -220,6 +270,13 @@ function renderMandala() {
 
   mandala.querySelectorAll('[data-seat]').forEach(node => {
     const select = () => selectGlyph(Number(node.dataset.seat))
+    node.addEventListener('click', select)
+    node.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); select() }
+    })
+  })
+  mandala.querySelectorAll('[data-sky-seat]').forEach(node => {
+    const select = () => selectGlyph(Number(node.dataset.skySeat))
     node.addEventListener('click', select)
     node.addEventListener('keydown', event => {
       if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); select() }
@@ -358,6 +415,51 @@ function toggleChamber() {
   renderDetail()
 }
 
+function toggleSkyDrawer(open = !state.skyOpen) {
+  state.skyOpen = open
+  skyDrawer.classList.toggle('is-open', open)
+  skyDrawer.setAttribute('aria-hidden', String(!open))
+  document.querySelector('[data-sky-open]').setAttribute('aria-expanded', String(open))
+  if (open) skyDrawer.querySelector('input')?.focus()
+}
+
+function setSkyKind(kind) {
+  skyDrawer.querySelectorAll('[data-sky-kind]').forEach(button => button.classList.toggle('is-active', button.dataset.skyKind === kind))
+  skyDrawer.querySelector('[data-birth-fields]').hidden = kind !== 'birth'
+  skyDrawer.dataset.kind = kind
+  if (kind === 'live') skyDrawer.querySelector('[name="moment"]').value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+}
+
+async function calculateSky(event) {
+  event.preventDefault()
+  const form = new FormData(event.currentTarget)
+  const moment = new Date(form.get('moment'))
+  if (!Number.isFinite(moment.getTime())) return
+  const status = document.querySelector('[data-sky-status]')
+  status.textContent = 'Opening the ephemeris · 96 measured bodies'
+  event.currentTarget.querySelector('button[type="submit"]').disabled = true
+  try {
+    const response = await fetch('/api/ephemeris', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ timestamp: moment.toISOString(), bodies: uniqueMeasuredBodies(glyphs) }),
+    })
+    const result = await response.json()
+    if (!response.ok) throw new Error(result.error || 'The ephemeris could not be opened.')
+    state.skyPlacements = placementsBySeat(result.placements, glyphs)
+    state.skyTimestamp = result.timestamp
+    state.skyMode = skyDrawer.dataset.kind || 'live'
+    status.textContent = `${state.skyPlacements.size} seats measured · NASA/JPL Horizons`
+    document.body.classList.add('has-sky')
+    renderMandala()
+    updateModeCopy()
+  } catch (error) {
+    status.textContent = error.message
+  } finally {
+    event.currentTarget.querySelector('button[type="submit"]').disabled = false
+  }
+}
+
 document.querySelector('[data-enter]').addEventListener('click', () => {
   threshold.classList.add('is-departing')
   instrument.setAttribute('aria-hidden', 'false')
@@ -366,6 +468,11 @@ document.querySelector('[data-enter]').addEventListener('click', () => {
 
 document.querySelectorAll('[data-mode]').forEach(button => button.addEventListener('click', () => setMode(button.dataset.mode)))
 document.querySelector('[data-chamber]').addEventListener('click', toggleChamber)
+document.querySelector('[data-sky-open]').addEventListener('click', () => toggleSkyDrawer())
+document.querySelector('[data-sky-close]').addEventListener('click', () => toggleSkyDrawer(false))
+document.querySelectorAll('[data-sky-kind]').forEach(button => button.addEventListener('click', () => setSkyKind(button.dataset.skyKind)))
+document.querySelector('[data-sky-form]').addEventListener('submit', calculateSky)
+setSkyKind('live')
 
 document.querySelector('#glyph-search').addEventListener('input', event => {
   const query = event.target.value.trim().toLowerCase()
@@ -385,6 +492,7 @@ document.addEventListener('keydown', event => {
   if (event.key === 'ArrowLeft') state.chamber ? selectRelated(-1) : selectGlyph(state.selected - 1)
   if (['1', '2', '3'].includes(event.key)) setMode(['rings', 'faces', 'chords'][Number(event.key) - 1])
   if (event.key === 'Escape' && state.chamber) toggleChamber()
+  else if (event.key === 'Escape' && state.skyOpen) toggleSkyDrawer(false)
 })
 
 renderLegend()
