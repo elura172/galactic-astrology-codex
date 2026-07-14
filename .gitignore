@@ -4,3 +4,8 @@
 # Private applied readings remain local. Commit only sanitized templates.
 natal_resonance_pass.md
 files/natal_resonance_pass.md
+
+# Local build products and dependencies
+node_modules/
+dist/
+.cache/
