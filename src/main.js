@@ -5,6 +5,7 @@ import { placementsBySeat, uniqueMeasuredBodies, zodiacLabel } from './sky.js'
 import { chartAngles, houseForLongitude, lineageHouseResonance, MAJOR_BODIES, wholeSignHouses, zonedDateTime } from './chart.js'
 import { conjunction } from './astrology.js'
 import { angleContacts, densestCluster, planetaryCourts, populatedCourts, strongestChords } from './reading.js'
+import { composeTransmission } from './synthesis.js'
 
 const COLORS = [
   '#748c83', '#7893a3', '#9a7892', '#a45743', '#c29854',
@@ -497,6 +498,29 @@ function renderReadingFolio() {
   const anglePoints = state.chartAngles ? Object.entries({ Ascendant: state.chartAngles.ascendant, Midheaven: state.chartAngles.midheaven, Descendant: state.chartAngles.descendant, 'Imum Coeli': state.chartAngles.imumCoeli }).map(([label, longitude]) => ({ id: `angle:${label}`, kind: 'angle', label, longitude })) : []
   const chords = strongestChords([...uniqueGlyphPoints, ...planetPoints, ...anglePoints])
   const chordFamilies = ['Step', 'Gift', 'Vow', 'Spiral', 'Mirror']
+  const evidence = [
+    ...(cluster ? [{
+      id: 'cluster:primary', kind: 'cluster', count: cluster.members.length,
+      measurement: `${cluster.members.length} unique bodies within ${cluster.span.toFixed(3)}° centered at ${zodiacLabel(cluster.center)}`,
+      transmission: `The field gathers ${cluster.members.map(member => member.name).slice(0, 4).join(', ')}${cluster.members.length > 4 ? ', and their companions' : ''} into one council. Their offices ask to be received together before any one voice is interpreted alone.`,
+    }] : []),
+    ...populated.flatMap(court => court.contacts.map(contact => ({
+      id: `court:${court.body.command}:${contact.glyph.number}`, kind: 'court', tier: contact.tier, orb: contact.orb,
+      measurement: `${contact.glyph.name} conjunct ${court.body.name} · orb ${contact.orb.toFixed(3)}°`,
+      transmission: `Within ${court.body.name}'s court, ${contact.glyph.name} carries the office of ${contact.glyph.function.toLowerCase()}. Notice where this function is already moving through the life, and where it is still asking for form.`,
+    }))),
+    ...angles.flatMap(angle => angle.contacts.map(contact => ({
+      id: `angle:${angle.key}:${contact.glyph.number}`, kind: 'angle', tier: contact.tier, orb: contact.orb, confidence: angle.confidence,
+      measurement: `${contact.glyph.name} conjunct ${angle.label} · orb ${contact.orb.toFixed(3)}° · ${angle.confidence}`,
+      transmission: `At the ${angle.label}, ${contact.glyph.name} approaches the threshold with its office of ${contact.glyph.function.toLowerCase()}. Receive this as an orientation, not an instruction.`,
+    }))),
+    ...chordFamilies.flatMap(family => (chords.get(family) || []).map((chord, index) => ({
+      id: `chord:${family}:${index}`, kind: 'chord', tier: chord.tier, orb: chord.orb,
+      measurement: `${chord.first.label} ${family} ${chord.second.label} · orb ${chord.orb.toFixed(3)}°`,
+      transmission: `A ${family} joins ${chord.first.label} and ${chord.second.label}. Let these two offices be heard in relationship: neither completes the sentence alone.`,
+    }))),
+  ]
+  const synthesis = composeTransmission(evidence)
   const isNatal = state.skyMode === 'birth'
   folio.innerHTML = `<header><span>${isNatal ? 'Natal' : 'Live'} result folio</span><h3>Measured correspondences</h3><p>Measurement and canonical interpretation remain separate registers.</p></header>
     <section><div class="folio-heading"><span>01</span><h4>Planetary courts</h4><small>${populated.length} populated</small></div>
@@ -514,6 +538,10 @@ function renderReadingFolio() {
         const familyChords = chords.get(family) || []
         return `<article class="chord-family"><h5>${family} <small>${familyChords.length ? `${familyChords.length} strongest` : 'silent'}</small></h5>${familyChords.length ? familyChords.map((chord, index) => `<button data-reveal-chord="${family}:${index}"><span><b>${escapeHtml(chord.first.label)} ↔ ${escapeHtml(chord.second.label)}</b><small>${chord.separation.toFixed(3)}° separation · orb ${chord.orb.toFixed(3)}°</small></span><em>${chord.tier}</em></button>`).join('') : '<p class="folio-silence">No chord within 2° of this family.</p>'}</article>`
       }).join('')}
+    </section>
+    <section class="synthesis-gate"><div class="folio-heading"><span>05</span><h4>Synthesis</h4><small>${synthesis.evidence.length} primary threads</small></div>
+      <div class="synthesis-threshold"><p>The following transmission is composed from the strongest measured relationships in this chart and the canonical offices they activate. It is offered as a mirror. Keep what brings recognition; leave what does not.</p><button data-receive-synthesis>Receive the synthesis <span>↓</span></button></div>
+      <div class="transmission" data-transmission hidden><span>Transmission</span>${synthesis.passages.map(passage => `<p>${escapeHtml(passage)}</p>`).join('')}<blockquote>What is measured creates the vessel. What is recognized remains yours to name.</blockquote><details><summary>Open the evidence record</summary>${synthesis.evidence.map(item => `<p><b>${item.score}</b><span>${escapeHtml(item.measurement)}</span></p>`).join('')}</details></div>
     </section>`
   folio.hidden = false
   folio.querySelectorAll('[data-folio-seat]').forEach(button => button.addEventListener('click', () => {
@@ -532,6 +560,12 @@ function renderReadingFolio() {
     renderMandala()
     toggleSkyDrawer(false)
   }))
+  folio.querySelector('[data-receive-synthesis]')?.addEventListener('click', buttonEvent => {
+    const transmission = folio.querySelector('[data-transmission]')
+    transmission.hidden = false
+    buttonEvent.currentTarget.setAttribute('aria-expanded', 'true')
+    transmission.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })
+  })
 }
 
 async function calculateSky(event) {
