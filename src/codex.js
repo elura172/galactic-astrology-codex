@@ -26,6 +26,11 @@ const clean = value => value
   .replace(/\s+/g, ' ')
   .trim() || ''
 
+export function catalogueIdentifier(catalogue) {
+  const number = catalogue.match(/\((\d+)\)/)?.[1]
+  return number ? { number: Number(number), horizonsCommand: `${number};` } : null
+}
+
 export function parseCodex(markdown) {
   const entries = []
   const pattern = /^\*\*(\d{2,3})\. ([^*]+)\*\* — ([^\n]+)\n([\s\S]*?)(?=^\*\*\d{2,3}\. |^## |^# |(?![\s\S]))/gm
@@ -50,9 +55,10 @@ export function parseCodex(markdown) {
 
   return entries.map(entry => ({
     ...entry,
+    catalogueId: catalogueIdentifier(entry.catalogue),
     groupIndex: Math.floor((entry.number - 1) / 9),
     seam: nameCounts.get(entry.name) > 1,
-    invoked: ['Venus', 'Uranus', 'Mirai'].includes(entry.name),
+    invoked: entry.catalogue.includes('Invoked Presence'),
   }))
 }
 

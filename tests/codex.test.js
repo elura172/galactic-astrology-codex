@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { parseCodex, seamCounterpart, chordDestinations, adjacentFaces, relatedGlyphNumbers, classifiedRelationships } from '../src/codex.js'
+import { parseCodex, catalogueIdentifier, seamCounterpart, chordDestinations, adjacentFaces, relatedGlyphNumbers, classifiedRelationships } from '../src/codex.js'
 
 const markdown = readFileSync(fileURLToPath(new URL('../codex_of_celestial_glyphs.md', import.meta.url)), 'utf8')
 const glyphs = parseCodex(markdown)
@@ -26,6 +26,15 @@ test('identifies canonical seams and invoked presences', () => {
   assert.deepEqual(seamGroups.get('Vesta').map(glyph => glyph.number), [25, 84])
   assert.deepEqual(seamGroups.get('Tesla').map(glyph => glyph.number), [13, 68])
   assert.equal(glyphs.filter(glyph => glyph.invoked).length, 3)
+})
+
+test('builds an unambiguous Horizons manifest for every measured body', () => {
+  assert.deepEqual(catalogueIdentifier('Asteroid (1)'), { number: 1, horizonsCommand: '1;' })
+  assert.equal(catalogueIdentifier('Planet · Invoked Presence'), null)
+  const measuredSeats = glyphs.filter(glyph => glyph.catalogueId)
+  assert.equal(measuredSeats.length, 105)
+  assert.equal(new Set(measuredSeats.map(glyph => glyph.catalogueId.number)).size, 96)
+  assert.equal(glyphs.filter(glyph => !glyph.catalogueId && glyph.invoked).length, 3)
 })
 
 test('derives seam counterparts in both directions', () => {
