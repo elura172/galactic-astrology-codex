@@ -554,7 +554,7 @@ function renderReadingFolio() {
     <section class="synthesis-gate" id="folio-synthesis"><div class="folio-heading"><span>05</span><h4>Synthesis</h4><small>${synthesis.evidence.length} primary threads</small></div>
       <div class="synthesis-threshold"><p>The following transmission is composed from the strongest measured relationships in this chart and the canonical offices they activate. It is offered as a mirror. Keep what brings recognition; leave what does not.</p><button data-receive-synthesis>Receive the synthesis <span>↓</span></button></div>
       <div class="transmission" data-transmission hidden><span>Transmission</span>${synthesis.passages.map(passage => `<p>${escapeHtml(passage)}</p>`).join('')}<blockquote class="chart-sentence">${escapeHtml(chartSentence)}</blockquote><p class="transmission-ground">What is measured creates the vessel. What is recognized remains yours to name.</p><details><summary>Open the evidence record</summary>${synthesis.evidence.map(item => `<p><b>${item.score}</b><span>${escapeHtml(item.measurement)}</span></p>`).join('')}</details></div>
-    </section><button class="export-record technical-only" data-export-record>Export technical record <span>JSON ↓</span></button>`
+    </section><div class="folio-actions"><button data-print-folio>Print / save folio <span>PDF ↗</span></button><button class="technical-only" data-export-record>Export technical record <span>JSON ↓</span></button></div>`
   folio.hidden = false
   folio.querySelectorAll('[data-folio-seat]').forEach(button => button.addEventListener('click', () => {
     selectGlyph(Number(button.dataset.folioSeat))
@@ -589,6 +589,22 @@ function renderReadingFolio() {
     transmission.hidden = false
     buttonEvent.currentTarget.setAttribute('aria-expanded', 'true')
     transmission.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })
+  })
+  folio.querySelector('[data-print-folio]').addEventListener('click', () => {
+    const transmission = folio.querySelector('[data-transmission]')
+    const previousDepth = folio.dataset.depth
+    const transmissionWasHidden = transmission.hidden
+    folio.dataset.depth = 'full'
+    transmission.hidden = false
+    document.body.classList.add('is-printing-folio')
+    const restore = () => {
+      document.body.classList.remove('is-printing-folio')
+      folio.dataset.depth = previousDepth
+      transmission.hidden = transmissionWasHidden
+      window.removeEventListener('afterprint', restore)
+    }
+    window.addEventListener('afterprint', restore)
+    window.print()
   })
   folio.querySelector('[data-export-record]').addEventListener('click', () => {
     const record = technicalRecord({ timestamp: state.skyTimestamp, mode: state.skyMode, placements: state.skyPlacements, planets: state.majorPlacements, angles: state.chartAngles, houses: state.houses, angleConfidence: state.angleConfidence })
