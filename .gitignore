@@ -1,0 +1,6 @@
+.DS_Store
+**/.DS_Store
+
+# Private applied readings remain local. Commit only sanitized templates.
+natal_resonance_pass.md
+files/natal_resonance_pass.md
