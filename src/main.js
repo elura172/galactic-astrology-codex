@@ -1,20 +1,6 @@
 import './style.css'
 import codexMarkdown from '../codex_of_celestial_glyphs.md?raw'
-
-const GROUPS = [
-  { short: 'I', name: 'Memory Keepers', lineage: 'Vega', gate: 'Vow Crown' },
-  { short: 'II', name: 'Sound & Word Weavers', lineage: 'Lyra', gate: 'Signal Path' },
-  { short: 'III', name: 'Sacred Devotionals', lineage: 'Arcturus', gate: 'Dream Circuit' },
-  { short: 'IV', name: 'Chaos Catalysts', lineage: 'Orion', gate: 'Flame Gate' },
-  { short: 'V', name: 'Beauty Makers', lineage: 'Aldebaran', gate: 'Mirror-Bond' },
-  { short: 'VI', name: 'Teachers & Patterners', lineage: 'Sirius', gate: 'Codex Mirror' },
-  { short: 'VII', name: 'Deathwalkers', lineage: 'Antares', gate: 'Threshold Warden' },
-  { short: 'VIII', name: 'Innovators & Futurists', lineage: 'Andromeda', gate: 'Bio-Architect' },
-  { short: 'IX', name: 'Lovers & Relationals', lineage: 'Alpha Centauri', gate: 'Heart Beacon' },
-  { short: 'X', name: 'Earth Stewards', lineage: 'Pleiades', gate: 'Earth Grid' },
-  { short: 'N', name: 'Deep Court', lineage: 'Galactic Core', gate: 'Nadir' },
-  { short: 'Z', name: 'Crown Court', lineage: 'Polaris', gate: 'Zenith' },
-]
+import { GROUPS, CHORDS, parseCodex, seamCounterpart, chordDestinations, adjacentFaces, relatedGlyphNumbers } from './codex.js'
 
 const COLORS = [
   '#748c83', '#7893a3', '#9a7892', '#a45743', '#c29854',
@@ -22,48 +8,6 @@ const COLORS = [
   '#514761', '#b38f52',
 ]
 
-const CHORDS = [
-  { offset: 1, name: 'Step', angle: '36°', className: 'step' },
-  { offset: 2, name: 'Gift', angle: '72°', className: 'gift' },
-  { offset: 3, name: 'Vow', angle: '108°', className: 'vow' },
-  { offset: 4, name: 'Spiral', angle: '144°', className: 'spiral' },
-  { offset: 5, name: 'Mirror', angle: '180°', className: 'mirror' },
-]
-
-const clean = value => value
-  ?.replace(/\*+/g, '')
-  .replace(/\s+/g, ' ')
-  .trim() || ''
-
-function parseCodex(markdown) {
-  const entries = []
-  const pattern = /^\*\*(\d{2,3})\. ([^*]+)\*\* — ([^\n]+)\n([\s\S]*?)(?=^\*\*\d{2,3}\. |^## |^# |(?![\s\S]))/gm
-  let match
-  while ((match = pattern.exec(markdown))) {
-    const body = match[4]
-    const field = (name, next) => clean(body.match(new RegExp(`${name}:\\s*([\\s\\S]*?)(?=\\n${next}:)`))?.[1])
-    entries.push({
-      number: Number(match[1]),
-      name: clean(match[2]),
-      catalogue: clean(match[3]),
-      function: field('Function', 'Craft Thread'),
-      craft: field('Craft Thread', 'Mirror Phrase'),
-      mirror: clean(body.match(/Mirror Phrase:\s*([^\n]+)/)?.[1]),
-    })
-  }
-
-  const nameCounts = entries.reduce((counts, entry) => {
-    counts.set(entry.name, (counts.get(entry.name) || 0) + 1)
-    return counts
-  }, new Map())
-
-  return entries.map(entry => ({
-    ...entry,
-    groupIndex: Math.floor((entry.number - 1) / 9),
-    seam: nameCounts.get(entry.name) > 1,
-    invoked: ['Venus', 'Uranus', 'Mirai'].includes(entry.name),
-  }))
-}
 
 const glyphs = parseCodex(codexMarkdown)
 const glyphByNumber = new Map(glyphs.map(glyph => [glyph.number, glyph]))
@@ -76,6 +20,9 @@ const state = {
   mode: 'rings',
   selected: 1,
   chamber: false,
+  relatedCursor: -1,
+  relatedRing: [],
+  relatedAnchor: null,
 }
 
 const app = document.querySelector('#app')
@@ -136,7 +83,7 @@ app.innerHTML = `
 
     <footer class="instrument-footer">
       <span>Canonical vessel · July 2026</span>
-      <span>← → move between seats</span>
+      <span data-footer-nav>← → move between seats</span>
       <span data-footer-state>Ring register active</span>
     </footer>
   </main>
@@ -255,6 +202,46 @@ function renderMandala() {
 function renderDetail() {
   const glyph = glyphByNumber.get(state.selected)
   const group = GROUPS[glyph.groupIndex]
+  const counterpart = seamCounterpart(glyph, glyphs)
+  const adjacent = adjacentFaces(glyph)
+  const chords = chordDestinations(glyph, glyphByNumber)
+  const relatedAnchor = glyphByNumber.get(state.relatedAnchor)
+  const chamberPanel = state.chamber ? `
+    <section class="chamber-panel" aria-label="Canonical relationships">
+      <div class="chamber-panel__heading">
+        <span>Canonical relationships</span>
+        <p>${state.relatedRing.length} related seats in the ring of seat ${String(relatedAnchor.number).padStart(3, '0')} · derived from the wheel</p>
+      </div>
+      <nav class="related-nav" aria-label="Previous and next related glyph">
+        <button data-related-prev aria-label="Previous related glyph">← <span>Previous related</span></button>
+        <button data-related-next aria-label="Next related glyph"><span>Next related</span> →</button>
+      </nav>
+      ${counterpart ? `<div class="relationship-block relationship-block--seam">
+        <span class="relationship-label">◆ Nine Seam counterpart</span>
+        <button class="relationship-jump" data-jump-seat="${counterpart.number}">
+          <b>${String(counterpart.number).padStart(3, '0')}</b><span>${escapeHtml(counterpart.name)}<small>${escapeHtml(GROUPS[counterpart.groupIndex].lineage)} · Face ${GROUPS[counterpart.groupIndex].short}</small></span><i>↗</i>
+        </button>
+      </div>` : ''}
+      <div class="relationship-block">
+        <span class="relationship-label">Lineage face</span>
+        <p class="lineage-name">${escapeHtml(group.lineage)} <small>Face ${group.short} · ${escapeHtml(group.name)}</small></p>
+        <div class="face-jumps">
+          ${adjacent.map(face => {
+            const target = glyphByNumber.get(face.number)
+            const targetGroup = GROUPS[face.groupIndex]
+            return `<button data-jump-seat="${target.number}"><small>${face.relation}</small><b>${targetGroup.short} · ${escapeHtml(targetGroup.lineage)}</b><span>${String(target.number).padStart(3, '0')} ${escapeHtml(target.name)}</span></button>`
+          }).join('')}
+        </div>
+        ${glyph.groupIndex > 9 ? '<p class="court-note">The axial courts touch five faces in their course, and together touch all ten rings.</p>' : ''}
+      </div>
+      <div class="relationship-block">
+        <span class="relationship-label">Decagonal chords</span>
+        ${chords.length ? `<div class="chord-destinations">${chords.map(({ chord, target }) => `
+          <button data-jump-seat="${target.number}">
+            <i class="legend-line legend-line--${chord.className}"></i><b>${chord.angle}<small>${chord.name}</small></b><span><em>${String(target.number).padStart(3, '0')}</em>${escapeHtml(target.name)}</span><strong>↗</strong>
+          </button>`).join('')}</div>` : '<p class="court-note">Axial seat · no decagonal chords. Its relationships travel by course.</p>'}
+      </div>
+    </section>` : ''
   detail.innerHTML = `
     <div class="detail-card">
       <div class="detail-card__topline"><span>Seat ${String(glyph.number).padStart(3, '0')}</span><span>${group.short}</span></div>
@@ -272,11 +259,15 @@ function renderDetail() {
         ${glyph.seam ? '<span>◆ Nine Seam</span>' : ''}
         ${glyph.invoked ? '<span>✦ Invoked Presence</span>' : '<span>○ Catalogue Seat</span>'}
       </div>
+      ${chamberPanel}
       <button class="chamber-key" data-detail-chamber>${state.chamber ? 'Return to instrument' : 'Enter this chamber'} <span>↗</span></button>
     </div>
   `
   detail.querySelector('[data-detail-chamber]').addEventListener('click', toggleChamber)
-  live.textContent = `Seat ${glyph.number}. ${glyph.name}. ${glyph.function}`
+  detail.querySelectorAll('[data-jump-seat]').forEach(button => button.addEventListener('click', () => selectGlyph(Number(button.dataset.jumpSeat))))
+  detail.querySelector('[data-related-prev]')?.addEventListener('click', () => selectRelated(-1))
+  detail.querySelector('[data-related-next]')?.addEventListener('click', () => selectRelated(1))
+  live.textContent = `Seat ${glyph.number}. ${glyph.name}. ${glyph.function}${state.chamber && counterpart ? ` Nine Seam counterpart: seat ${counterpart.number}, ${counterpart.name}.` : ''}`
 }
 
 function renderLegend() {
@@ -300,10 +291,23 @@ function updateModeCopy() {
   document.querySelector('[data-footer-state]').textContent = copy[3]
 }
 
-function selectGlyph(number) {
+function selectGlyph(number, preserveRelatedRing = false) {
   state.selected = ((number - 1 + glyphs.length) % glyphs.length) + 1
+  if (state.chamber && !preserveRelatedRing) {
+    state.relatedRing = relatedGlyphNumbers(glyphByNumber.get(state.selected), glyphs)
+    state.relatedCursor = -1
+    state.relatedAnchor = state.selected
+  }
   renderMandala()
   renderDetail()
+}
+
+function selectRelated(direction) {
+  if (!state.relatedRing.length) return
+  state.relatedCursor = state.relatedCursor === -1 && direction < 0
+    ? state.relatedRing.length - 1
+    : (state.relatedCursor + direction + state.relatedRing.length) % state.relatedRing.length
+  selectGlyph(state.relatedRing[state.relatedCursor], true)
 }
 
 function setMode(mode) {
@@ -316,8 +320,12 @@ function setMode(mode) {
 
 function toggleChamber() {
   state.chamber = !state.chamber
+  state.relatedRing = state.chamber ? relatedGlyphNumbers(glyphByNumber.get(state.selected), glyphs) : []
+  state.relatedCursor = -1
+  state.relatedAnchor = state.chamber ? state.selected : null
   document.body.classList.toggle('is-chamber', state.chamber)
   document.querySelector('[data-chamber]').setAttribute('aria-pressed', String(state.chamber))
+  document.querySelector('[data-footer-nav]').textContent = state.chamber ? '← → move through related glyphs · Esc exits' : '← → move between seats'
   renderDetail()
 }
 
@@ -344,8 +352,8 @@ document.querySelector('#glyph-search').addEventListener('input', event => {
 
 document.addEventListener('keydown', event => {
   if (event.target.matches('input')) return
-  if (event.key === 'ArrowRight') selectGlyph(state.selected + 1)
-  if (event.key === 'ArrowLeft') selectGlyph(state.selected - 1)
+  if (event.key === 'ArrowRight') state.chamber ? selectRelated(1) : selectGlyph(state.selected + 1)
+  if (event.key === 'ArrowLeft') state.chamber ? selectRelated(-1) : selectGlyph(state.selected - 1)
   if (['1', '2', '3'].includes(event.key)) setMode(['rings', 'faces', 'chords'][Number(event.key) - 1])
   if (event.key === 'Escape' && state.chamber) toggleChamber()
 })
