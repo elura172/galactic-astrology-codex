@@ -27,3 +27,14 @@ Personal natal readings remain local and are excluded from version control.
 The census, face braid, lineage structure, and healing ledger are reconciled. The
 canonical manuscripts and sanitized reading template are the baseline for subsequent
 interface, editorial, export, and publication work.
+
+## Interface development
+
+```bash
+npm install
+npm run dev
+npm run build
+```
+
+The interface imports the canonical Markdown directly, keeping the visual explorer in
+sync with the manuscripts. Its visual direction is recorded in `DESIGN_SYSTEM.md`.
