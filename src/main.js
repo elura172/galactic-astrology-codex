@@ -40,6 +40,7 @@ const state = {
   skyStatus: '',
   skyController: null,
   natalField: null,
+  comparisonCursor: 0,
 }
 
 const app = document.querySelector('#app')
@@ -250,6 +251,23 @@ function skyLayer(selected) {
     const label = polar(353, -75 + house.cusp)
     return `<g class="house-mark"><line x1="${inner.x}" y1="${inner.y}" x2="${outer.x}" y2="${outer.y}"/><text x="${label.x}" y="${label.y}">${house.house}</text></g>`
   }).join('') : ''
+  const comparison = state.skyMode === 'live' && state.natalField ? (() => {
+    const activations = crossChartActivations(glyphs, state.natalField.placements, state.natalField.planets, state.majorPlacements)
+    const available = activations.glyphContacts.length ? activations.glyphContacts : activations.planetaryChords
+    const active = available[state.comparisonCursor % Math.max(available.length, 1)]
+    const natalPoints = [...state.natalField.placements.entries()].map(([seat, placement]) => {
+      const point = polar(344, -90 + placement.longitude)
+      return `<circle class="natal-sky-point" cx="${point.x}" cy="${point.y}" r="1.2"><title>Natal seat ${seat}, ${escapeHtml(placement.name)} · ${zodiacLabel(placement.longitude)}</title></circle>`
+    }).join('')
+    if (!active) return `<g class="comparison-register"><circle cx="410" cy="410" r="344"/>${natalPoints}</g>`
+    const natalLongitude = active.natal.longitude
+    const livePoint = polar(370, -90 + active.live.longitude)
+    const natalPoint = polar(344, -90 + natalLongitude)
+    const label = active.natal.glyph
+      ? `${active.live.name} activates natal seat ${active.natal.glyph.number}, ${active.natal.glyph.name}`
+      : `${active.live.name} ${active.aspect} natal ${active.natal.name}`
+    return `<g class="comparison-register"><circle cx="410" cy="410" r="344"/>${natalPoints}<path class="comparison-bridge" d="M ${livePoint.x} ${livePoint.y} Q 410 410 ${natalPoint.x} ${natalPoint.y}"/><circle class="natal-sky-point is-active" cx="${natalPoint.x}" cy="${natalPoint.y}" r="5"/><title>${escapeHtml(label)} · orb ${active.orb.toFixed(3)}°</title></g>`
+  })() : ''
   const highlight = state.skyHighlight?.type === 'cluster'
     ? `<path class="cluster-wash" d="${ringPath(365, 399, -90 + state.skyHighlight.center - state.skyHighlight.span / 2, -90 + state.skyHighlight.center + state.skyHighlight.span / 2)}"/>`
     : state.skyHighlight?.type === 'chord' ? (() => {
@@ -257,7 +275,7 @@ function skyLayer(selected) {
       const second = polar(370, -90 + state.skyHighlight.second.longitude)
       return `<path class="measured-chord measured-chord--${state.skyHighlight.aspect.toLowerCase()}" d="M ${first.x} ${first.y} Q 410 410 ${second.x} ${second.y}"/>`
     })() : ''
-  return `<g class="zodiac-register">${highlight}${ticks}${labels}${houses}${angles}</g><g class="sky-points">${points}${planets}${bridge}</g>`
+  return `<g class="zodiac-register">${highlight}${ticks}${labels}${houses}${angles}</g>${comparison}<g class="sky-points">${points}${planets}${bridge}</g>`
 }
 
 function renderMandala() {
@@ -518,19 +536,37 @@ function renderComparisonPanel() {
   const activations = crossChartActivations(glyphs, state.natalField.placements, state.natalField.planets, state.majorPlacements)
   const glyphContacts = activations.glyphContacts.slice(0, 8)
   const planetaryChords = activations.planetaryChords.slice(0, 5)
+  const navigable = activations.glyphContacts.length ? activations.glyphContacts : activations.planetaryChords
+  state.comparisonCursor = navigable.length ? state.comparisonCursor % navigable.length : 0
+  const active = navigable[state.comparisonCursor]
+  const activeLabel = active?.natal.glyph
+    ? `${active.live.name} conjunct natal seat ${String(active.natal.glyph.number).padStart(3, '0')} · ${active.natal.glyph.name}`
+    : active ? `${active.live.name} ${active.aspect} natal ${active.natal.name}` : 'No activation within the declared orbs'
   panel.innerHTML = `<header><span>Birth field beneath Live Sky</span><small>Birth field retained in memory only</small></header>
     <p class="comparison-intro">These are present contacts to the retained birth field, measured as activations rather than predictions.</p>
-    <div class="comparison-group"><h4>Glyph activations <small>${activations.glyphContacts.length} within 3°</small></h4>${glyphContacts.length ? glyphContacts.map(contact => `<button data-comparison-seat="${contact.natal.glyph.number}"><b>${escapeHtml(contact.live.name)} → ${String(contact.natal.glyph.number).padStart(3, '0')} · ${escapeHtml(contact.natal.glyph.name)}</b><span>Conjunction · orb ${contact.orb.toFixed(3)}° · ${contact.tier}</span></button>`).join('') : '<p>No live planet is within 3° of a natal glyph seat.</p>'}</div>
+    <nav class="comparison-nav" aria-label="Move through live activations"><button type="button" data-comparison-prev aria-label="Previous activation">←</button><p aria-live="polite"><b>${escapeHtml(activeLabel)}</b><span>${active ? `Orb ${active.orb.toFixed(3)}° · ${active.tier}` : 'Measured silence'}</span></p><button type="button" data-comparison-next aria-label="Next activation">→</button></nav>
+    <div class="comparison-group"><h4>Glyph activations <small>${activations.glyphContacts.length} within 3°</small></h4>${glyphContacts.length ? glyphContacts.map((contact, index) => `<button class="${index === state.comparisonCursor ? 'is-active' : ''}" data-comparison-index="${index}" data-comparison-seat="${contact.natal.glyph.number}"><b>${escapeHtml(contact.live.name)} → ${String(contact.natal.glyph.number).padStart(3, '0')} · ${escapeHtml(contact.natal.glyph.name)}</b><span>Conjunction · orb ${contact.orb.toFixed(3)}° · ${contact.tier}</span></button>`).join('') : '<p>No live planet is within 3° of a natal glyph seat.</p>'}</div>
     <div class="comparison-group"><h4>Planetary chords <small>${activations.planetaryChords.length} within 2°</small></h4>${planetaryChords.length ? planetaryChords.map(contact => `<p><b>${escapeHtml(contact.live.name)} ${contact.aspect} ${escapeHtml(contact.natal.name)}</b><span>Orb ${contact.orb.toFixed(3)}° · ${contact.tier}</span></p>`).join('') : '<p>No live-to-natal planetary chord is within 2°.</p>'}</div>
     <button class="comparison-forget" type="button" data-forget-birth>Forget retained birth field <span>×</span></button>`
   panel.hidden = false
   panel.querySelectorAll('[data-comparison-seat]').forEach(button => button.addEventListener('click', () => {
+    state.comparisonCursor = Number(button.dataset.comparisonIndex)
     selectGlyph(Number(button.dataset.comparisonSeat))
-    toggleSkyDrawer(false)
+    renderMandala()
   }))
+  const moveComparison = direction => {
+    if (!navigable.length) return
+    state.comparisonCursor = (state.comparisonCursor + direction + navigable.length) % navigable.length
+    renderComparisonPanel()
+    renderMandala()
+  }
+  panel.querySelector('[data-comparison-prev]').addEventListener('click', () => moveComparison(-1))
+  panel.querySelector('[data-comparison-next]').addEventListener('click', () => moveComparison(1))
   panel.querySelector('[data-forget-birth]').addEventListener('click', () => {
     state.natalField = null
+    state.comparisonCursor = 0
     panel.hidden = true
+    renderMandala()
   })
 }
 
@@ -677,6 +713,7 @@ async function calculateSky(event) {
         angles = chartAngles(moment, Number(form.get('latitude')), Number(form.get('longitude')))
         houses = wholeSignHouses(angles.ascendant)
       }
+      state.comparisonCursor = 0
     } else {
       moment = new Date(form.get('moment'))
     }

@@ -365,6 +365,10 @@ input:focus-visible,
 .sky-bridge { fill: none; stroke: var(--rose); stroke-width: 1; stroke-dasharray: 3 4; opacity: .7; pointer-events: none; vector-effect: non-scaling-stroke; }
 .planet-point circle { fill: var(--paper); stroke: var(--blue); stroke-width: 1; }
 .planet-point text { fill: var(--ink); font: 7px var(--serif); text-anchor: middle; }
+.comparison-register > circle:first-child { fill: none; stroke: var(--rose); stroke-dasharray: 1 5; stroke-width: .7; opacity: .5; vector-effect: non-scaling-stroke; }
+.natal-sky-point { fill: var(--rose); opacity: .22; }
+.natal-sky-point.is-active { fill: var(--paper); stroke: var(--rose); stroke-width: 2; opacity: 1; vector-effect: non-scaling-stroke; }
+.comparison-bridge { fill: none; stroke: var(--rose); stroke-width: 1.4; opacity: .82; vector-effect: non-scaling-stroke; }
 .angle-mark { stroke: var(--rose); stroke-width: 1.5; }
 .angle-mark text { fill: var(--rose); stroke: none; font: 6px var(--mono); font-weight: 600; }
 .angle-mark.is-approximate { stroke-dasharray: 2 3; opacity: .55; }
@@ -476,11 +480,19 @@ input:focus-visible,
 .comparison-panel > header span, .comparison-panel > header small { display: block; font: 7px/1.5 var(--mono); letter-spacing: .12em; text-transform: uppercase; }
 .comparison-panel > header small { color: var(--quiet); letter-spacing: .05em; }
 .comparison-intro { margin: 0; padding: 12px; color: var(--quiet); border-bottom: 1px solid var(--rule); font: italic 11px/1.45 var(--serif); }
+.comparison-nav { display: grid; grid-template-columns: 34px 1fr 34px; align-items: stretch; border-bottom: 1px solid var(--ink); }
+.comparison-nav button { color: var(--ink); border: 0; background: transparent; font: 15px var(--serif); cursor: pointer; }
+.comparison-nav button:first-child { border-right: 1px solid var(--rule); }
+.comparison-nav button:last-child { border-left: 1px solid var(--rule); }
+.comparison-nav p { margin: 0; padding: 9px; text-align: center; }
+.comparison-nav b, .comparison-nav span { display: block; font: 7px/1.4 var(--mono); text-transform: uppercase; }
+.comparison-nav span { margin-top: 3px; color: var(--quiet); }
 .comparison-group { padding: 12px; border-bottom: 1px solid var(--rule); }
 .comparison-group h4 { display: flex; justify-content: space-between; gap: 10px; margin: 0 0 8px; font: 16px var(--serif); }
 .comparison-group h4 small { color: var(--quiet); font: 6px var(--mono); text-align: right; text-transform: uppercase; }
 .comparison-group button, .comparison-group > p { display: block; width: 100%; margin: 0; padding: 8px 0; color: var(--ink); border: 0; border-top: 1px solid var(--rule); background: transparent; text-align: left; }
 .comparison-group button { cursor: pointer; }
+.comparison-group button.is-active { color: var(--rose); }
 .comparison-group b, .comparison-group span { display: block; font: 7px/1.45 var(--mono); text-transform: uppercase; }
 .comparison-group span { margin-top: 2px; color: var(--quiet); }
 .comparison-forget { display: flex; justify-content: space-between; width: 100%; padding: 10px 12px; color: var(--rose); border: 0; background: transparent; font: 7px var(--mono); letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
