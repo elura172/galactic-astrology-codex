@@ -472,9 +472,23 @@ input:focus-visible,
 .house-resonance span { font: 12px var(--serif); }
 .house-resonance small { color: var(--quiet); text-align: right; }
 .reading-folio { margin: 28px -25px -25px; border-top: 1px solid var(--ink); }
+.folio-depth { position: sticky; z-index: 3; top: 0; display: grid; grid-template-columns: repeat(3, 1fr); background: var(--paper); border-bottom: 1px solid var(--ink); }
+.folio-depth button { padding: 11px 5px; border: 0; background: transparent; font: 7px var(--mono); letter-spacing: .09em; text-transform: uppercase; cursor: pointer; }
+.folio-depth button + button { border-left: 1px solid var(--rule); }
+.folio-depth button.is-active { color: var(--paper); background: var(--ink); }
+.folio-index { display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid var(--ink); }
+.folio-index button { padding: 9px 2px; border: 0; border-right: 1px solid var(--rule); background: transparent; font: 6px var(--mono); text-transform: uppercase; cursor: pointer; }
+.reading-folio[data-depth="essential"] .folio-index, .reading-folio[data-depth="essential"] .folio-full { display: none; }
+.reading-folio[data-depth="full"] .essential-record, .reading-folio[data-depth="technical"] .essential-record { display: none; }
+.technical-only { display: none !important; }
+.reading-folio[data-depth="technical"] .technical-only { display: flex !important; }
+.essential-record > p { display: grid; grid-template-columns: 62px 1fr; gap: 10px; margin: 0; padding: 10px 25px; border-top: 1px solid var(--rule); }
+.essential-record > p b { color: var(--rose); font: 7px var(--mono); text-transform: uppercase; }
+.essential-record > p span { font: 11px/1.4 var(--sans); }
 .reading-folio > header { padding: 20px 25px; }
 .reading-folio > header > span { color: var(--quiet); font: 7px var(--mono); letter-spacing: .16em; text-transform: uppercase; }
 .reading-folio > header h3 { margin: 5px 0; font: 30px/1 var(--serif); letter-spacing: -.035em; }
+.reading-folio > header h3:focus-visible { outline: 1px solid var(--gold); outline-offset: 4px; }
 .reading-folio > header p { margin: 0; color: var(--quiet); font: italic 11px var(--serif); }
 .reading-folio > section { border-top: 1px solid var(--ink); }
 .folio-heading { display: grid; grid-template-columns: 28px 1fr auto; align-items: baseline; padding: 12px 25px; border-bottom: 1px solid var(--ink); }
@@ -503,6 +517,8 @@ input:focus-visible,
 .transmission > p { margin: 22px 0; font: 20px/1.5 var(--serif); }
 .transmission > p:first-of-type::first-letter { float: left; margin: 5px 7px 0 0; color: var(--gold); font: 50px/.7 var(--serif); }
 .transmission blockquote { margin: 30px 0; padding: 17px 0; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); font: italic 14px/1.5 var(--serif); }
+.transmission .chart-sentence { color: var(--rose); font-size: 18px; }
+.transmission > .transmission-ground { color: var(--quiet); font: italic 12px/1.5 var(--serif); }
 .transmission details { border-top: 1px solid var(--rule); }
 .transmission summary { padding: 12px 0; font: 7px var(--mono); letter-spacing: .12em; text-transform: uppercase; cursor: pointer; }
 .transmission details p { display: grid; grid-template-columns: 28px 1fr; gap: 8px; margin: 0; padding: 8px 0; border-top: 1px solid var(--rule); }

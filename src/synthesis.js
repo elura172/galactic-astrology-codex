@@ -38,3 +38,26 @@ export function composeTransmission(records, limit = 4) {
     evidence: selected,
   }
 }
+
+export function chordTransmission(aspect, first, second) {
+  const language = {
+    Step: `A Step carries the work of ${first} toward ${second}. Receive it as an apprenticeship: something is being handed forward, and readiness matters.`,
+    Gift: `A Gift opens naturally between ${first} and ${second}. What moves easily here still asks to be tended, practiced, and offered with care.`,
+    Vow: `A Vow binds ${first} with ${second} across a passage of change. The bond may be old; its living purpose must still be chosen with open eyes.`,
+    Spiral: `A Spiral weaves ${first} and ${second} across the long arc. Its pattern may disclose itself slowly, through work whose completion cannot be hurried.`,
+    Mirror: `A Mirror places ${first} across from ${second}. Neither side is the whole; recognition waits at the center that can hold them both.`,
+  }
+  return language[aspect] || `${aspect} brings ${first} and ${second} into relationship.`
+}
+
+function conciseTheme(theme) {
+  return theme?.split(/[;,—]/)[0].trim().replace(/[.!?]+$/, '')
+}
+
+export function finalSentence(records) {
+  const themes = rankEvidence(records).flatMap(record => record.themes || []).map(conciseTheme).filter(Boolean)
+  const unique = [...new Set(themes.map(theme => theme.toLowerCase()))]
+  if (!unique.length) return 'The chart remains quiet enough that no final sentence should be forced.'
+  if (unique.length === 1) return `This chart returns to ${unique[0]}, asking that it be recognized before it is interpreted.`
+  return `This chart gathers ${unique[0]} with ${unique[1]}, asking that neither be carried without the other.`
+}
