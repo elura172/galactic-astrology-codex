@@ -8,3 +8,4 @@ files/natal_resonance_pass.md
 # Local build products and dependencies
 node_modules/
 dist/
+.cache/
