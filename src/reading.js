@@ -68,7 +68,9 @@ export function densestCluster(glyphs, placementsBySeat, maxSpan = 6) {
 
 export function strongestChords(points, perFamily = 5) {
   const tierRank = { lattice: 0, working: 1, whisper: 2 }
-  const contacts = contactsBetween(points, decagonalChord).sort((first, second) => tierRank[first.tier] - tierRank[second.tier] || first.orb - second.orb)
+  const contacts = contactsBetween(points, decagonalChord)
+    .filter(contact => !(contact.first.kind === 'angle' && contact.second.kind === 'angle'))
+    .sort((first, second) => tierRank[first.tier] - tierRank[second.tier] || first.orb - second.orb)
   const byFamily = new Map()
   contacts.forEach(contact => {
     const family = byFamily.get(contact.aspect) || []

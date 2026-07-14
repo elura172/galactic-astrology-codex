@@ -16,7 +16,19 @@ export function rankEvidence(records) {
 }
 
 export function composeTransmission(records, limit = 4) {
-  const selected = rankEvidence(records).filter(record => record.transmission).slice(0, limit)
+  const ranked = rankEvidence(records).filter(record => record.transmission)
+  const selected = []
+  const representedKinds = new Set()
+  ranked.forEach(record => {
+    if (selected.length < limit && !representedKinds.has(record.kind)) {
+      selected.push(record)
+      representedKinds.add(record.kind)
+    }
+  })
+  ranked.forEach(record => {
+    if (selected.length < limit && !selected.includes(record)) selected.push(record)
+  })
+  selected.sort((first, second) => second.score - first.score || first.sourceIndex - second.sourceIndex)
   if (!selected.length) return {
     passages: ['The measured field is quiet. No synthesis should be made larger than that silence.'],
     evidence: [],

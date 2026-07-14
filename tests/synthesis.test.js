@@ -25,3 +25,16 @@ test('composes only from supplied evidence and preserves traceability', () => {
   assert.deepEqual(result.passages, result.evidence.map(item => item.transmission))
   assert.ok(result.evidence.every(item => records.some(record => record.id === item.id)))
 })
+
+test('represents distinct evidence layers before repeating a stronger layer', () => {
+  const records = [
+    { id: 'angle-1', kind: 'angle', tier: 'exact', transmission: 'Angle one.' },
+    { id: 'angle-2', kind: 'angle', tier: 'exact', transmission: 'Angle two.' },
+    { id: 'court', kind: 'court', tier: 'working', transmission: 'Court.' },
+    { id: 'cluster', kind: 'cluster', count: 4, transmission: 'Cluster.' },
+    { id: 'chord', kind: 'chord', tier: 'lattice', transmission: 'Chord.' },
+  ]
+  const result = composeTransmission(records, 4)
+  assert.equal(new Set(result.evidence.map(item => item.kind)).size, 4)
+  assert.equal(result.evidence.filter(item => item.kind === 'angle').length, 1)
+})
