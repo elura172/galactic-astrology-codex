@@ -471,6 +471,19 @@ input:focus-visible,
 .calculation-progress p { display: flex; justify-content: space-between; margin: 7px 0 0; color: var(--quiet); font: 7px var(--mono); text-transform: uppercase; }
 .calculation-progress button { padding: 0; color: var(--rose); border: 0; background: transparent; font: inherit; text-transform: inherit; cursor: pointer; }
 .sky-status { min-height: 32px; color: var(--quiet); font: italic 11px/1.5 var(--serif); }
+.comparison-panel { margin: 18px 0; border: 1px solid var(--ink); }
+.comparison-panel > header { padding: 12px; border-bottom: 1px solid var(--ink); }
+.comparison-panel > header span, .comparison-panel > header small { display: block; font: 7px/1.5 var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+.comparison-panel > header small { color: var(--quiet); letter-spacing: .05em; }
+.comparison-intro { margin: 0; padding: 12px; color: var(--quiet); border-bottom: 1px solid var(--rule); font: italic 11px/1.45 var(--serif); }
+.comparison-group { padding: 12px; border-bottom: 1px solid var(--rule); }
+.comparison-group h4 { display: flex; justify-content: space-between; gap: 10px; margin: 0 0 8px; font: 16px var(--serif); }
+.comparison-group h4 small { color: var(--quiet); font: 6px var(--mono); text-align: right; text-transform: uppercase; }
+.comparison-group button, .comparison-group > p { display: block; width: 100%; margin: 0; padding: 8px 0; color: var(--ink); border: 0; border-top: 1px solid var(--rule); background: transparent; text-align: left; }
+.comparison-group button { cursor: pointer; }
+.comparison-group b, .comparison-group span { display: block; font: 7px/1.45 var(--mono); text-transform: uppercase; }
+.comparison-group span { margin-top: 2px; color: var(--quiet); }
+.comparison-forget { display: flex; justify-content: space-between; width: 100%; padding: 10px 12px; color: var(--rose); border: 0; background: transparent; font: 7px var(--mono); letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
 .house-resonance { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--ink); }
 .house-resonance > span { color: var(--quiet); font: 7px var(--mono); letter-spacing: .16em; text-transform: uppercase; }
 .house-resonance > p { margin: 6px 0 12px; color: var(--quiet); font: italic 11px var(--serif); }
