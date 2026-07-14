@@ -4,6 +4,7 @@ import { GROUPS, CHORDS, parseCodex, seamCounterpart, chordDestinations, adjacen
 import { placementsBySeat, uniqueMeasuredBodies, zodiacLabel } from './sky.js'
 import { chartAngles, houseForLongitude, lineageHouseResonance, MAJOR_BODIES, wholeSignHouses, zonedDateTime } from './chart.js'
 import { conjunction } from './astrology.js'
+import { angleContacts, planetaryCourts, populatedCourts } from './reading.js'
 
 const COLORS = [
   '#748c83', '#7893a3', '#9a7892', '#a45743', '#c29854',
@@ -116,6 +117,7 @@ app.innerHTML = `
       <button class="sky-calculate" type="submit">Calculate glyph field <span>→</span></button>
       <p class="sky-status" data-sky-status aria-live="polite"></p>
       <section class="house-resonance" data-house-resonance hidden></section>
+      <section class="reading-folio" data-reading-folio hidden></section>
     </form>
   </aside>
 `
@@ -468,6 +470,35 @@ function setSkyKind(kind) {
   if (kind === 'live') skyDrawer.querySelector('[name="moment"]').value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)
 }
 
+function contactRows(contacts) {
+  return contacts.map(contact => `<button data-folio-seat="${contact.glyph.number}">
+    <span><b>${String(contact.glyph.number).padStart(3, '0')} · ${escapeHtml(contact.glyph.name)}</b><small>${zodiacLabel(contact.placement.longitude)} · orb ${contact.orb.toFixed(3)}° · ${contact.tier}</small></span>
+    <em>${escapeHtml(contact.glyph.function)}</em>
+  </button>`).join('')
+}
+
+function renderReadingFolio() {
+  const folio = document.querySelector('[data-reading-folio]')
+  const courts = planetaryCourts(glyphs, state.skyPlacements, state.majorPlacements, MAJOR_BODIES)
+  const populated = populatedCourts(courts)
+  const angles = angleContacts(glyphs, state.skyPlacements, state.chartAngles, state.angleConfidence)
+  const silentCourts = courts.filter(court => !court.contacts.length && court.planet)
+  const isNatal = state.skyMode === 'birth'
+  folio.innerHTML = `<header><span>${isNatal ? 'Natal' : 'Live'} result folio</span><h3>Measured correspondences</h3><p>Measurement and canonical interpretation remain separate registers.</p></header>
+    <section><div class="folio-heading"><span>01</span><h4>Planetary courts</h4><small>${populated.length} populated</small></div>
+      ${populated.length ? populated.map(court => `<article><h5>${court.body.symbol} ${court.body.name}'s Court <small>${zodiacLabel(court.planet.longitude)}</small></h5>${contactRows(court.contacts)}</article>`).join('') : '<p class="folio-silence">No glyph lies within the declared 3° conjunction range of a planetary point.</p>'}
+      ${silentCourts.length ? `<p class="folio-silence"><b>Silent courts</b> ${silentCourts.map(court => court.body.name).join(' · ')}</p>` : ''}
+    </section>
+    <section><div class="folio-heading"><span>02</span><h4>The four angles</h4><small>${angles.length ? state.angleConfidence : 'unavailable'}</small></div>
+      ${angles.length ? angles.map(angle => `<article class="angle-record${angle.confidence === 'approximate' ? ' is-approximate' : ''}"><h5>${angle.label} <small>${zodiacLabel(angle.longitude)} · ${angle.confidence}</small></h5>${angle.contacts.length ? contactRows(angle.contacts) : '<p class="folio-silence">No glyph within 3° · measured silence</p>'}</article>`).join('') : `<p class="folio-silence">${isNatal ? 'Birth time unknown: angle claims are suppressed.' : 'Angles belong to a located chart and are not inferred for the geocentric live field.'}</p>`}
+    </section>`
+  folio.hidden = false
+  folio.querySelectorAll('[data-folio-seat]').forEach(button => button.addEventListener('click', () => {
+    selectGlyph(Number(button.dataset.folioSeat))
+    toggleSkyDrawer(false)
+  }))
+}
+
 async function calculateSky(event) {
   event.preventDefault()
   const form = new FormData(event.currentTarget)
@@ -524,6 +555,7 @@ async function calculateSky(event) {
     } else {
       resonancePanel.hidden = true
     }
+    renderReadingFolio()
     document.body.classList.add('has-sky')
     renderMandala()
     renderDetail()

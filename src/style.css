@@ -458,6 +458,25 @@ input:focus-visible,
 .house-resonance b, .house-resonance small { font: 7px var(--mono); text-transform: uppercase; }
 .house-resonance span { font: 12px var(--serif); }
 .house-resonance small { color: var(--quiet); text-align: right; }
+.reading-folio { margin: 28px -25px -25px; border-top: 1px solid var(--ink); }
+.reading-folio > header { padding: 20px 25px; }
+.reading-folio > header > span { color: var(--quiet); font: 7px var(--mono); letter-spacing: .16em; text-transform: uppercase; }
+.reading-folio > header h3 { margin: 5px 0; font: 30px/1 var(--serif); letter-spacing: -.035em; }
+.reading-folio > header p { margin: 0; color: var(--quiet); font: italic 11px var(--serif); }
+.reading-folio > section { border-top: 1px solid var(--ink); }
+.folio-heading { display: grid; grid-template-columns: 28px 1fr auto; align-items: baseline; padding: 12px 25px; border-bottom: 1px solid var(--ink); }
+.folio-heading > span, .folio-heading small { color: var(--quiet); font: 7px var(--mono); text-transform: uppercase; }
+.folio-heading h4 { margin: 0; font: 18px var(--serif); }
+.reading-folio article { padding: 14px 25px; border-bottom: 1px solid var(--rule); }
+.reading-folio article.is-approximate { background: repeating-linear-gradient(135deg, transparent 0 8px, rgba(182,139,58,.035) 8px 9px); }
+.reading-folio h5 { display: flex; justify-content: space-between; gap: 10px; margin: 0 0 8px; font: 18px var(--serif); }
+.reading-folio h5 small { color: var(--quiet); font: 7px/1.4 var(--mono); text-align: right; text-transform: uppercase; }
+.reading-folio article button { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; padding: 9px 0; border: 0; border-top: 1px solid var(--rule); background: transparent; text-align: left; cursor: pointer; }
+.reading-folio article button b, .reading-folio article button small { display: block; font: 7px/1.45 var(--mono); text-transform: uppercase; }
+.reading-folio article button small { margin-top: 3px; color: var(--quiet); }
+.reading-folio article button em { font: italic 11px/1.35 var(--serif); }
+.folio-silence { margin: 0; padding: 12px 25px; color: var(--quiet); font: italic 11px/1.45 var(--serif); }
+.folio-silence b { color: var(--ink); font: 7px var(--mono); letter-spacing: .1em; text-transform: uppercase; }
 .measured-sky { margin: 18px 0; padding: 12px 0; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); }
 .measured-sky > span { color: var(--quiet); font: 7px var(--mono); letter-spacing: .15em; text-transform: uppercase; }
 .measured-sky p { display: flex; justify-content: space-between; gap: 10px; margin: 9px 0; font: 14px var(--serif); }
