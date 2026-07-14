@@ -4,7 +4,7 @@ import { GROUPS, CHORDS, parseCodex, seamCounterpart, chordDestinations, adjacen
 import { fetchEphemerisInBatches, placementsBySeat, technicalRecord, uniqueMeasuredBodies, zodiacLabel } from './sky.js'
 import { chartAngles, houseForLongitude, lineageHouseResonance, MAJOR_BODIES, wholeSignHouses, zonedDateTime } from './chart.js'
 import { conjunction } from './astrology.js'
-import { angleContacts, densestCluster, planetaryCourts, populatedCourts, strongestChords } from './reading.js'
+import { angleContacts, crossChartActivations, densestCluster, planetaryCourts, populatedCourts, strongestChords } from './reading.js'
 import { chordTransmission, composeTransmission, finalSentence } from './synthesis.js'
 
 const COLORS = [
@@ -39,6 +39,7 @@ const state = {
   skyHighlight: null,
   skyStatus: '',
   skyController: null,
+  natalField: null,
 }
 
 const app = document.querySelector('#app')
@@ -123,6 +124,7 @@ app.innerHTML = `
       <button class="sky-calculate" type="submit">Calculate glyph field <span>→</span></button>
       <div class="calculation-progress" data-calculation-progress hidden><div><i data-progress-bar></i></div><p><span data-progress-count>0 / 106</span><button type="button" data-cancel-sky>Cancel</button></p></div>
       <p class="sky-status" data-sky-status aria-live="polite"></p>
+      <section class="comparison-panel" data-comparison-panel hidden></section>
       <section class="house-resonance" data-house-resonance hidden></section>
       <section class="reading-folio" data-reading-folio hidden></section>
     </form>
@@ -507,6 +509,31 @@ function contactRows(contacts) {
   </button>`).join('')
 }
 
+function renderComparisonPanel() {
+  const panel = document.querySelector('[data-comparison-panel]')
+  if (state.skyMode !== 'live' || !state.natalField) {
+    panel.hidden = true
+    return
+  }
+  const activations = crossChartActivations(glyphs, state.natalField.placements, state.natalField.planets, state.majorPlacements)
+  const glyphContacts = activations.glyphContacts.slice(0, 8)
+  const planetaryChords = activations.planetaryChords.slice(0, 5)
+  panel.innerHTML = `<header><span>Birth field beneath Live Sky</span><small>Birth field retained in memory only</small></header>
+    <p class="comparison-intro">These are present contacts to the retained birth field, measured as activations rather than predictions.</p>
+    <div class="comparison-group"><h4>Glyph activations <small>${activations.glyphContacts.length} within 3°</small></h4>${glyphContacts.length ? glyphContacts.map(contact => `<button data-comparison-seat="${contact.natal.glyph.number}"><b>${escapeHtml(contact.live.name)} → ${String(contact.natal.glyph.number).padStart(3, '0')} · ${escapeHtml(contact.natal.glyph.name)}</b><span>Conjunction · orb ${contact.orb.toFixed(3)}° · ${contact.tier}</span></button>`).join('') : '<p>No live planet is within 3° of a natal glyph seat.</p>'}</div>
+    <div class="comparison-group"><h4>Planetary chords <small>${activations.planetaryChords.length} within 2°</small></h4>${planetaryChords.length ? planetaryChords.map(contact => `<p><b>${escapeHtml(contact.live.name)} ${contact.aspect} ${escapeHtml(contact.natal.name)}</b><span>Orb ${contact.orb.toFixed(3)}° · ${contact.tier}</span></p>`).join('') : '<p>No live-to-natal planetary chord is within 2°.</p>'}</div>
+    <button class="comparison-forget" type="button" data-forget-birth>Forget retained birth field <span>×</span></button>`
+  panel.hidden = false
+  panel.querySelectorAll('[data-comparison-seat]').forEach(button => button.addEventListener('click', () => {
+    selectGlyph(Number(button.dataset.comparisonSeat))
+    toggleSkyDrawer(false)
+  }))
+  panel.querySelector('[data-forget-birth]').addEventListener('click', () => {
+    state.natalField = null
+    panel.hidden = true
+  })
+}
+
 function renderReadingFolio() {
   const folio = document.querySelector('[data-reading-folio]')
   const courts = planetaryCourts(glyphs, state.skyPlacements, state.majorPlacements, MAJOR_BODIES)
@@ -688,6 +715,15 @@ async function calculateSky(event) {
     state.skyHighlight = null
     const angleStatus = kind === 'birth' ? (angles ? ` · Whole Sign houses · angles ${confidence}` : ' · houses and angles suppressed') : ''
     status.textContent = `${state.skyPlacements.size} seats + ${state.majorPlacements.length} planets measured${angleStatus} · NASA/JPL Horizons`
+    if (kind === 'birth') {
+      state.natalField = {
+        timestamp: result.timestamp,
+        placements: new Map([...state.skyPlacements].map(([seat, placement]) => [seat, { ...placement }])),
+        planets: state.majorPlacements.map(placement => ({ ...placement })),
+      }
+      status.textContent += ' · birth field retained in memory for Live Sky comparison'
+    }
+    renderComparisonPanel()
     const resonancePanel = document.querySelector('[data-house-resonance]')
     if (houses) {
       const resonances = lineageHouseResonance(glyphs, state.skyPlacements, houses)

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { angleContacts, densestCluster, planetaryCourts, populatedCourts, strongestChords } from '../src/reading.js'
+import { angleContacts, crossChartActivations, densestCluster, planetaryCourts, populatedCourts, strongestChords } from '../src/reading.js'
 
 const glyphs = [
   { number: 1, name: 'Near Sun' },
@@ -70,4 +70,18 @@ test('excludes inevitable angle-axis chords from interpretive ranking', () => {
   ])
   assert.ok(!(lattice.get('Mirror') || []).some(contact => contact.first.kind === 'angle' && contact.second.kind === 'angle'))
   assert.equal(lattice.get('Step')[0].second.kind, 'glyph')
+})
+
+test('derives explicit live-to-natal glyph contacts and planetary chords', () => {
+  const glyphs = [{ number: 1, name: 'First' }, { number: 2, name: 'Second' }]
+  const natalPlacements = new Map([[1, { longitude: 10 }], [2, { longitude: 90 }]])
+  const natalPlanets = [{ command: '10', name: 'Natal Sun', longitude: 82 }]
+  const livePlanets = [{ command: '499', name: 'Live Mars', longitude: 10.5 }]
+  const result = crossChartActivations(glyphs, natalPlacements, natalPlanets, livePlanets)
+  assert.equal(result.glyphContacts.length, 1)
+  assert.equal(result.glyphContacts[0].natal.glyph.number, 1)
+  assert.equal(result.glyphContacts[0].tier, 'exact')
+  assert.equal(result.planetaryChords.length, 1)
+  assert.equal(result.planetaryChords[0].aspect, 'Gift')
+  assert.ok(Math.abs(result.planetaryChords[0].orb - .5) < .001)
 })

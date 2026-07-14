@@ -79,3 +79,21 @@ export function strongestChords(points, perFamily = 5) {
   })
   return byFamily
 }
+
+export function crossChartActivations(glyphs, natalPlacements, natalPlanets, livePlanets) {
+  const conjunctionRank = { exact: 0, working: 1, whisper: 2 }
+  const chordRank = { lattice: 0, working: 1, whisper: 2 }
+  const glyphContacts = livePlanets.flatMap(live => glyphs.flatMap(glyph => {
+    const natal = natalPlacements.get(glyph.number)
+    if (!natal) return []
+    const contact = conjunction(live.longitude, natal.longitude)
+    return contact ? [{ live, natal: { ...natal, glyph }, ...contact }] : []
+  })).sort((first, second) => conjunctionRank[first.tier] - conjunctionRank[second.tier] || first.orb - second.orb || first.natal.glyph.number - second.natal.glyph.number)
+
+  const planetaryChords = livePlanets.flatMap(live => natalPlanets.flatMap(natal => {
+    const contact = decagonalChord(live.longitude, natal.longitude)
+    return contact ? [{ live, natal, ...contact }] : []
+  })).sort((first, second) => chordRank[first.tier] - chordRank[second.tier] || first.orb - second.orb)
+
+  return { glyphContacts, planetaryChords }
+}
