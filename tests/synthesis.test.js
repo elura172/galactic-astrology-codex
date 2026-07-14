@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { composeTransmission, evidenceScore, rankEvidence } from '../src/synthesis.js'
+import { chordTransmission, composeTransmission, evidenceScore, finalSentence, rankEvidence } from '../src/synthesis.js'
 
 test('ranks measured precision and repeated support above weaker suggestions', () => {
   const exact = { kind: 'court', tier: 'exact', orb: .2, count: 1 }
@@ -37,4 +37,23 @@ test('represents distinct evidence layers before repeating a stronger layer', ()
   const result = composeTransmission(records, 4)
   assert.equal(new Set(result.evidence.map(item => item.kind)).size, 4)
   assert.equal(result.evidence.filter(item => item.kind === 'angle').length, 1)
+})
+
+test('gives each canonical chord a distinct received voice', () => {
+  const voices = ['Step', 'Gift', 'Vow', 'Spiral', 'Mirror'].map(aspect => chordTransmission(aspect, 'Memory', 'Signal'))
+  assert.equal(new Set(voices).size, 5)
+  assert.match(voices[0], /apprenticeship/)
+  assert.match(voices[2], /binds/)
+  assert.match(voices[4], /center/)
+})
+
+test('forms the final sentence only from supplied recurring themes', () => {
+  const sentence = finalSentence([
+    { kind: 'court', tier: 'exact', themes: ['Memory keeping — archive'] },
+    { kind: 'cluster', count: 5, themes: ['Signal weaving; voice'] },
+  ])
+  assert.match(sentence, /memory keeping/)
+  assert.match(sentence, /signal weaving/)
+  assert.doesNotMatch(sentence, /destiny|purpose/)
+  assert.match(finalSentence([]), /no final sentence should be forced/)
 })
