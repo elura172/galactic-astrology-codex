@@ -368,6 +368,8 @@ input:focus-visible,
 .angle-mark { stroke: var(--rose); stroke-width: 1.5; }
 .angle-mark text { fill: var(--rose); stroke: none; font: 6px var(--mono); font-weight: 600; }
 .angle-mark.is-approximate { stroke-dasharray: 2 3; opacity: .55; }
+.house-mark { stroke: rgba(182,139,58,.62); stroke-width: .8; }
+.house-mark text { fill: var(--gold); stroke: none; font: 6px var(--mono); text-anchor: middle; }
 
 .plot-readout { position: absolute; left: 25px; bottom: 20px; width: 8px; height: 8px; overflow: hidden; clip-path: inset(50%); }
 
@@ -448,6 +450,14 @@ input:focus-visible,
 .sky-calculate { display: flex; justify-content: space-between; width: 100%; padding: 14px; color: var(--paper); border: 1px solid var(--ink); background: var(--ink); font: 9px var(--mono); letter-spacing: .1em; text-transform: uppercase; cursor: pointer; }
 .sky-calculate:disabled { cursor: wait; opacity: .5; }
 .sky-status { min-height: 32px; color: var(--quiet); font: italic 11px/1.5 var(--serif); }
+.house-resonance { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--ink); }
+.house-resonance > span { color: var(--quiet); font: 7px var(--mono); letter-spacing: .16em; text-transform: uppercase; }
+.house-resonance > p { margin: 6px 0 12px; color: var(--quiet); font: italic 11px var(--serif); }
+.house-resonance ol { margin: 0; padding: 0; list-style: none; }
+.house-resonance li { display: grid; grid-template-columns: 62px 1fr auto; gap: 8px; padding: 7px 0; border-top: 1px solid var(--rule); }
+.house-resonance b, .house-resonance small { font: 7px var(--mono); text-transform: uppercase; }
+.house-resonance span { font: 12px var(--serif); }
+.house-resonance small { color: var(--quiet); text-align: right; }
 .measured-sky { margin: 18px 0; padding: 12px 0; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); }
 .measured-sky > span { color: var(--quiet); font: 7px var(--mono); letter-spacing: .15em; text-transform: uppercase; }
 .measured-sky p { display: flex; justify-content: space-between; gap: 10px; margin: 9px 0; font: 14px var(--serif); }
@@ -480,6 +490,7 @@ input:focus-visible,
 .is-chamber .wordmark__mark, .is-chamber .mode-switch button.is-active { color: var(--ink); background: var(--paper); }
 .is-chamber .zodiac-register { stroke: rgba(231,223,202,.3); }
 .is-chamber .zodiac-register text { fill: rgba(231,223,202,.5); }
+.is-chamber .house-mark { stroke: rgba(196,163,95,.48); }
 
 @media (max-width: 1080px) {
   .instrument { padding: 10px; }

@@ -66,3 +66,31 @@ export function chartAngles(date, latitude, longitude) {
     siderealTime: sidereal,
   }
 }
+
+export function wholeSignHouses(ascendant) {
+  const firstCusp = Math.floor(normalizeLongitude(ascendant) / 30) * 30
+  return Array.from({ length: 12 }, (_, index) => ({
+    house: index + 1,
+    cusp: normalizeLongitude(firstCusp + index * 30),
+  }))
+}
+
+export function houseForLongitude(longitude, houses) {
+  if (!Array.isArray(houses) || houses.length !== 12) throw new TypeError('A complete twelve-house wheel is required.')
+  const firstCusp = houses[0].cusp
+  return Math.floor(normalizeLongitude(longitude - firstCusp) / 30) + 1
+}
+
+export function lineageHouseResonance(glyphs, placementsBySeat, houses) {
+  const resonance = new Map()
+  glyphs.forEach(glyph => {
+    const placement = placementsBySeat.get(glyph.number)
+    if (!placement) return
+    const house = houseForLongitude(placement.longitude, houses)
+    const key = `${house}:${glyph.groupIndex}`
+    const existing = resonance.get(key) || { house, groupIndex: glyph.groupIndex, seats: [] }
+    existing.seats.push(glyph.number)
+    resonance.set(key, existing)
+  })
+  return [...resonance.values()].sort((first, second) => first.house - second.house || first.groupIndex - second.groupIndex)
+}

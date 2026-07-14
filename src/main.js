@@ -2,7 +2,7 @@ import './style.css'
 import codexMarkdown from '../codex_of_celestial_glyphs.md?raw'
 import { GROUPS, CHORDS, parseCodex, seamCounterpart, chordDestinations, adjacentFaces, relatedGlyphNumbers, classifiedRelationships } from './codex.js'
 import { placementsBySeat, uniqueMeasuredBodies, zodiacLabel } from './sky.js'
-import { chartAngles, MAJOR_BODIES, zonedDateTime } from './chart.js'
+import { chartAngles, houseForLongitude, lineageHouseResonance, MAJOR_BODIES, wholeSignHouses, zonedDateTime } from './chart.js'
 import { conjunction } from './astrology.js'
 
 const COLORS = [
@@ -33,6 +33,7 @@ const state = {
   majorPlacements: [],
   chartAngles: null,
   angleConfidence: null,
+  houses: null,
   skyStatus: '',
 }
 
@@ -114,6 +115,7 @@ app.innerHTML = `
       <div class="sky-privacy"><i>◇</i><p><b>Transient by design</b>Nothing entered here is saved. The ephemeris service receives only the selected instant and canonical body identifiers.</p></div>
       <button class="sky-calculate" type="submit">Calculate glyph field <span>→</span></button>
       <p class="sky-status" data-sky-status aria-live="polite"></p>
+      <section class="house-resonance" data-house-resonance hidden></section>
     </form>
   </aside>
 `
@@ -231,7 +233,13 @@ function skyLayer(selected) {
     const inner = polar(375, -90 + longitude)
     return `<g class="angle-mark${state.angleConfidence === 'approximate' ? ' is-approximate' : ''}"><line x1="${inner.x}" y1="${inner.y}" x2="${outer.x}" y2="${outer.y}"/><text x="${outer.x}" y="${outer.y}">${label}</text></g>`
   }).join('') : ''
-  return `<g class="zodiac-register">${ticks}${labels}${angles}</g><g class="sky-points">${points}${planets}${bridge}</g>`
+  const houses = state.houses ? state.houses.map(house => {
+    const outer = polar(365, -90 + house.cusp)
+    const inner = polar(342, -90 + house.cusp)
+    const label = polar(353, -75 + house.cusp)
+    return `<g class="house-mark"><line x1="${inner.x}" y1="${inner.y}" x2="${outer.x}" y2="${outer.y}"/><text x="${label.x}" y="${label.y}">${house.house}</text></g>`
+  }).join('') : ''
+  return `<g class="zodiac-register">${ticks}${labels}${houses}${angles}</g><g class="sky-points">${points}${planets}${bridge}</g>`
 }
 
 function renderMandala() {
@@ -314,9 +322,10 @@ function renderDetail() {
     const body = MAJOR_BODIES.find(candidate => candidate.command === placement.command)
     return contact ? [{ ...contact, body, placement }] : []
   }) : []
+  const natalHouse = measured && state.houses ? houseForLongitude(measured.longitude, state.houses) : null
   const skyReading = measured ? `<section class="measured-sky">
     <span>Measured sky · ${state.skyMode === 'birth' ? 'Natal field' : 'Live field'}</span>
-    <p><b>${zodiacLabel(measured.longitude)}</b><small>Latitude ${measured.latitude.toFixed(3)}° · NASA/JPL Horizons</small></p>
+    <p><b>${zodiacLabel(measured.longitude)}</b><small>${natalHouse ? `Whole Sign house ${natalHouse} · ` : ''}Latitude ${measured.latitude.toFixed(3)}° · NASA/JPL Horizons</small></p>
     ${planetContacts.length ? `<div>${planetContacts.map(contact => `<p><b>${contact.body.symbol} ${contact.body.name}</b><small>${contact.tier} conjunction · orb ${contact.orb.toFixed(3)}°</small></p>`).join('')}</div>` : '<em>No planetary conjunction within 3° · a measured silence</em>'}
   </section>` : ''
   const chamberPanel = state.chamber ? `
@@ -466,12 +475,14 @@ async function calculateSky(event) {
   const confidence = form.get('confidence')
   let moment
   let angles = null
+  let houses = null
   try {
     if (kind === 'birth') {
       moment = zonedDateTime(form.get('moment'), form.get('timezone'))
       if (confidence !== 'unknown') {
         if (form.get('latitude') === '' || form.get('longitude') === '') throw new Error('Confirmed coordinates are required for chart angles.')
         angles = chartAngles(moment, Number(form.get('latitude')), Number(form.get('longitude')))
+        houses = wholeSignHouses(angles.ascendant)
       }
     } else {
       moment = new Date(form.get('moment'))
@@ -495,11 +506,24 @@ async function calculateSky(event) {
     state.skyPlacements = placementsBySeat(result.placements, glyphs)
     state.majorPlacements = result.placements.filter(placement => MAJOR_BODIES.some(body => body.command === placement.command))
     state.chartAngles = angles
+    state.houses = houses
     state.angleConfidence = kind === 'birth' ? confidence : null
     state.skyTimestamp = result.timestamp
     state.skyMode = kind
-    const angleStatus = kind === 'birth' ? (angles ? ` · angles ${confidence}` : ' · angles suppressed') : ''
+    const angleStatus = kind === 'birth' ? (angles ? ` · Whole Sign houses · angles ${confidence}` : ' · houses and angles suppressed') : ''
     status.textContent = `${state.skyPlacements.size} seats + ${state.majorPlacements.length} planets measured${angleStatus} · NASA/JPL Horizons`
+    const resonancePanel = document.querySelector('[data-house-resonance]')
+    if (houses) {
+      const resonances = lineageHouseResonance(glyphs, state.skyPlacements, houses)
+      const dominant = Array.from({ length: 12 }, (_, index) => {
+        const candidates = resonances.filter(item => item.house === index + 1).sort((a, b) => b.seats.length - a.seats.length)
+        return candidates[0]
+      }).filter(Boolean)
+      resonancePanel.innerHTML = `<span>Lineage–house resonance</span><p>Calculated houses remain distinct from canonical faces.</p><ol>${dominant.map(item => `<li><b>House ${item.house}</b><span>${escapeHtml(GROUPS[item.groupIndex].lineage)}</span><small>${item.seats.length} glyph seat${item.seats.length === 1 ? '' : 's'}</small></li>`).join('')}</ol>`
+      resonancePanel.hidden = false
+    } else {
+      resonancePanel.hidden = true
+    }
     document.body.classList.add('has-sky')
     renderMandala()
     renderDetail()
