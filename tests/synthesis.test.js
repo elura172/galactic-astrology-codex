@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { chordTransmission, composeTransmission, evidenceScore, finalSentence, rankEvidence } from '../src/synthesis.js'
+import { chordTransmission, composeActivationTransmission, composeTransmission, evidenceScore, finalSentence, rankEvidence } from '../src/synthesis.js'
 
 test('ranks measured precision and repeated support above weaker suggestions', () => {
   const exact = { kind: 'court', tier: 'exact', orb: .2, count: 1 }
@@ -56,4 +56,22 @@ test('forms the final sentence only from supplied recurring themes', () => {
   assert.match(sentence, /signal weaving/)
   assert.doesNotMatch(sentence, /destiny|purpose/)
   assert.match(finalSentence([]), /no final sentence should be forced/)
+})
+
+test('composes a restrained activation reading from measured cross-chart evidence', () => {
+  const result = composeActivationTransmission({
+    glyphContacts: [{ live: { name: 'Mars' }, natal: { glyph: { name: 'Memory', function: 'Keeping the archive' } }, tier: 'exact', orb: .2 }],
+    planetaryChords: [{ live: { name: 'Venus' }, natal: { name: 'Saturn' }, aspect: 'Gift', tier: 'working', orb: .7 }],
+  })
+  assert.equal(result.passages.length, 2)
+  assert.equal(result.evidence.length, 2)
+  assert.match(result.passages[0], /Mars.*Memory/)
+  assert.match(result.passages[1], /Gift.*live Venus.*natal Saturn/)
+  assert.match(result.closing, /not a verdict/)
+})
+
+test('does not force an activation transmission from a measured silence', () => {
+  const result = composeActivationTransmission({ glyphContacts: [], planetaryChords: [] })
+  assert.equal(result.evidence.length, 0)
+  assert.match(result.passages[0], /quiet/)
 })

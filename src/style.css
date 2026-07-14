@@ -495,6 +495,19 @@ input:focus-visible,
 .comparison-group button.is-active { color: var(--rose); }
 .comparison-group b, .comparison-group span { display: block; font: 7px/1.45 var(--mono); text-transform: uppercase; }
 .comparison-group span { margin-top: 2px; color: var(--quiet); }
+.activation-gate { padding: 18px 12px; border-bottom: 1px solid var(--ink); background: linear-gradient(135deg, rgba(182,139,58,.08), transparent 62%); }
+.activation-gate > span { color: var(--rose); font: 7px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+.activation-gate h4 { margin: 5px 0 8px; font: 21px/1.1 var(--serif); }
+.activation-gate > p { margin: 0 0 13px; color: var(--quiet); font: italic 11px/1.5 var(--serif); }
+.activation-gate > button { display: flex; justify-content: space-between; width: 100%; padding: 10px; color: var(--paper); border: 1px solid var(--ink); background: var(--ink); font: 7px var(--mono); letter-spacing: .1em; text-transform: uppercase; cursor: pointer; }
+.activation-gate [data-activation-transmission] { padding-top: 14px; }
+.activation-gate [data-activation-transmission] > p { margin: 14px 0; font: 16px/1.5 var(--serif); }
+.activation-gate blockquote { margin: 18px 0 0; padding: 12px 0; color: var(--rose); border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); font: italic 12px/1.5 var(--serif); }
+.activation-gate details { margin-top: 12px; }
+.activation-gate summary { font: 7px var(--mono); letter-spacing: .1em; text-transform: uppercase; cursor: pointer; }
+.activation-gate details p { display: grid; grid-template-columns: 80px 1fr; gap: 8px; margin: 0; padding: 8px 0; border-top: 1px solid var(--rule); }
+.activation-gate details b, .activation-gate details span { font: 7px/1.4 var(--mono); text-transform: uppercase; }
+.activation-gate details span { color: var(--quiet); }
 .comparison-forget { display: flex; justify-content: space-between; width: 100%; padding: 10px 12px; color: var(--rose); border: 0; background: transparent; font: 7px var(--mono); letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
 .house-resonance { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--ink); }
 .house-resonance > span { color: var(--quiet); font: 7px var(--mono); letter-spacing: .16em; text-transform: uppercase; }

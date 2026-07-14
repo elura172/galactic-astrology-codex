@@ -50,6 +50,37 @@ export function chordTransmission(aspect, first, second) {
   return language[aspect] || `${aspect} brings ${first} and ${second} into relationship.`
 }
 
+export function composeActivationTransmission(activations, limit = 3) {
+  const tierRank = { exact: 0, lattice: 0, working: 1, whisper: 2 }
+  const glyphRecords = activations.glyphContacts.map(contact => ({
+    kind: 'glyph activation', tier: contact.tier, orb: contact.orb,
+    measurement: `${contact.live.name} conjunct natal ${contact.natal.glyph.name} · orb ${contact.orb.toFixed(3)}°`,
+    transmission: `${contact.live.name} now meets the natal seat of ${contact.natal.glyph.name}. Its office of ${contact.natal.glyph.function.toLowerCase()} comes into the present field: notice where recognition is already occurring, without requiring an outcome.`,
+  }))
+  const chordRecords = activations.planetaryChords.map(contact => ({
+    kind: 'planetary chord', tier: contact.tier, orb: contact.orb,
+    measurement: `${contact.live.name} ${contact.aspect} natal ${contact.natal.name} · orb ${contact.orb.toFixed(3)}°`,
+    transmission: chordTransmission(contact.aspect, `live ${contact.live.name}`, `natal ${contact.natal.name}`),
+  }))
+  const ranked = [...glyphRecords, ...chordRecords].sort((first, second) => tierRank[first.tier] - tierRank[second.tier] || first.orb - second.orb)
+  const selected = []
+  ;[glyphRecords, chordRecords].forEach(group => {
+    const strongest = group.sort((first, second) => tierRank[first.tier] - tierRank[second.tier] || first.orb - second.orb)[0]
+    if (strongest && selected.length < limit) selected.push(strongest)
+  })
+  ranked.forEach(record => {
+    if (selected.length < limit && !selected.includes(record)) selected.push(record)
+  })
+  selected.sort((first, second) => tierRank[first.tier] - tierRank[second.tier] || first.orb - second.orb)
+  return selected.length ? {
+    passages: selected.map(record => record.transmission), evidence: selected,
+    closing: 'This is present weather around the natal field: a condition to meet, not a verdict about what follows.',
+  } : {
+    passages: ['The comparison field is quiet within the declared orbs. Nothing needs to be made louder than that silence.'], evidence: [],
+    closing: 'A measured silence is also part of the weather.',
+  }
+}
+
 function conciseTheme(theme) {
   return theme?.split(/[;,—]/)[0].trim().replace(/[.!?]+$/, '')
 }

@@ -5,7 +5,7 @@ import { fetchEphemerisInBatches, placementsBySeat, technicalRecord, uniqueMeasu
 import { chartAngles, houseForLongitude, lineageHouseResonance, MAJOR_BODIES, wholeSignHouses, zonedDateTime } from './chart.js'
 import { conjunction } from './astrology.js'
 import { angleContacts, crossChartActivations, densestCluster, planetaryCourts, populatedCourts, strongestChords } from './reading.js'
-import { chordTransmission, composeTransmission, finalSentence } from './synthesis.js'
+import { chordTransmission, composeActivationTransmission, composeTransmission, finalSentence } from './synthesis.js'
 
 const COLORS = [
   '#748c83', '#7893a3', '#9a7892', '#a45743', '#c29854',
@@ -536,6 +536,7 @@ function renderComparisonPanel() {
   const activations = crossChartActivations(glyphs, state.natalField.placements, state.natalField.planets, state.majorPlacements)
   const glyphContacts = activations.glyphContacts.slice(0, 8)
   const planetaryChords = activations.planetaryChords.slice(0, 5)
+  const transmission = composeActivationTransmission(activations)
   const navigable = activations.glyphContacts.length ? activations.glyphContacts : activations.planetaryChords
   state.comparisonCursor = navigable.length ? state.comparisonCursor % navigable.length : 0
   const active = navigable[state.comparisonCursor]
@@ -546,6 +547,7 @@ function renderComparisonPanel() {
     <p class="comparison-intro">These are present contacts to the retained birth field, measured as activations rather than predictions.</p>
     <nav class="comparison-nav" aria-label="Move through live activations"><button type="button" data-comparison-prev aria-label="Previous activation">←</button><p aria-live="polite"><b>${escapeHtml(activeLabel)}</b><span>${active ? `Orb ${active.orb.toFixed(3)}° · ${active.tier}` : 'Measured silence'}</span></p><button type="button" data-comparison-next aria-label="Next activation">→</button></nav>
     <div class="comparison-group"><h4>Glyph activations <small>${activations.glyphContacts.length} within 3°</small></h4>${glyphContacts.length ? glyphContacts.map((contact, index) => `<button class="${index === state.comparisonCursor ? 'is-active' : ''}" data-comparison-index="${index}" data-comparison-seat="${contact.natal.glyph.number}"><b>${escapeHtml(contact.live.name)} → ${String(contact.natal.glyph.number).padStart(3, '0')} · ${escapeHtml(contact.natal.glyph.name)}</b><span>Conjunction · orb ${contact.orb.toFixed(3)}° · ${contact.tier}</span></button>`).join('') : '<p>No live planet is within 3° of a natal glyph seat.</p>'}</div>
+    <section class="activation-gate"><span>Present-field transmission</span><h4>What is being activated now?</h4><p>Composed only from the strongest contacts measured above. Receive it as weather, not prediction.</p><button type="button" data-receive-activation aria-expanded="false">Receive the activation <span>↓</span></button><div data-activation-transmission hidden>${transmission.passages.map(passage => `<p>${escapeHtml(passage)}</p>`).join('')}<blockquote>${escapeHtml(transmission.closing)}</blockquote><details><summary>Open the evidence</summary>${transmission.evidence.map(item => `<p><b>${escapeHtml(item.kind)}</b><span>${escapeHtml(item.measurement)}</span></p>`).join('')}</details></div></section>
     <div class="comparison-group"><h4>Planetary chords <small>${activations.planetaryChords.length} within 2°</small></h4>${planetaryChords.length ? planetaryChords.map(contact => `<p><b>${escapeHtml(contact.live.name)} ${contact.aspect} ${escapeHtml(contact.natal.name)}</b><span>Orb ${contact.orb.toFixed(3)}° · ${contact.tier}</span></p>`).join('') : '<p>No live-to-natal planetary chord is within 2°.</p>'}</div>
     <button class="comparison-forget" type="button" data-forget-birth>Forget retained birth field <span>×</span></button>`
   panel.hidden = false
@@ -562,6 +564,12 @@ function renderComparisonPanel() {
   }
   panel.querySelector('[data-comparison-prev]').addEventListener('click', () => moveComparison(-1))
   panel.querySelector('[data-comparison-next]').addEventListener('click', () => moveComparison(1))
+  panel.querySelector('[data-receive-activation]').addEventListener('click', event => {
+    const transmissionPanel = panel.querySelector('[data-activation-transmission]')
+    transmissionPanel.hidden = false
+    event.currentTarget.setAttribute('aria-expanded', 'true')
+    transmissionPanel.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'nearest' })
+  })
   panel.querySelector('[data-forget-birth]').addEventListener('click', () => {
     state.natalField = null
     state.comparisonCursor = 0
