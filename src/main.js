@@ -109,13 +109,15 @@ app.innerHTML = `
     <div class="sky-kind" role="group" aria-label="Chart kind"><button class="is-active" data-sky-kind="live">Live sky</button><button data-sky-kind="birth">Birth chart</button></div>
     <button class="reference-chart" data-reference-chart>Load Greenwich · J2000 reference</button>
     <form data-sky-form>
-      <label>Moment in local time<input type="datetime-local" name="moment" required></label>
+      <fieldset class="entry-stage entry-stage--moment"><legend><b>01</b><span data-moment-label>Moment in local time</span></legend><input type="datetime-local" name="moment" required><p data-time-convention>The chart is measured at the entered local clock time.</p></fieldset>
       <div class="birth-fields" data-birth-fields hidden>
-        <label>Time confidence<select name="confidence"><option value="exact">Exact</option><option value="approximate">Approximate</option><option value="unknown">Unknown</option></select></label>
-        <label>Birthplace note <input name="place" autocomplete="off" placeholder="City, country · optional local note"></label>
-        <div class="coordinate-fields"><label>Latitude<input name="latitude" type="number" min="-90" max="90" step="any" placeholder="43.6532"></label><label>Longitude<input name="longitude" type="number" min="-180" max="180" step="any" placeholder="-79.3832"></label></div>
-        <label>Confirmed timezone<input name="timezone" placeholder="America/Toronto" autocomplete="off"></label>
-        <p>Coordinates and timezone are confirmed directly; the birthplace text remains local and is never sent to a geocoder.</p>
+        <fieldset class="entry-stage"><legend><b>02</b>Time confidence</legend><select name="confidence"><option value="exact">Exact · angles and houses included</option><option value="approximate">Approximate · angles marked provisional</option><option value="unknown">Unknown · angles and houses withheld</option></select><p>Choose the confidence of the recorded clock time, not the date.</p></fieldset>
+        <fieldset class="entry-stage"><legend><b>03</b>Place and timezone</legend>
+          <label>Birthplace note <input name="place" autocomplete="off" placeholder="City, country · optional local note"></label>
+          <div class="coordinate-fields" data-coordinate-fields><label>Latitude<input name="latitude" type="number" min="-90" max="90" step="any" placeholder="43.6532"></label><label>Longitude<input name="longitude" type="number" min="-180" max="180" step="any" placeholder="-79.3832"></label></div>
+          <label>Confirmed timezone<input name="timezone" required placeholder="America/Toronto" autocomplete="off" aria-describedby="timezone-help"></label>
+          <p id="timezone-help">Use an IANA timezone such as America/Toronto. Coordinates and timezone are confirmed directly; the birthplace note remains on this device.</p>
+        </fieldset>
       </div>
       <div class="sky-privacy"><i>◇</i><p><b>Transient by design</b>Nothing entered here is saved. The ephemeris service receives only the selected instant and canonical body identifiers.</p></div>
       <button class="sky-calculate" type="submit">Calculate glyph field <span>→</span></button>
@@ -477,9 +479,25 @@ function toggleSkyDrawer(open = !state.skyOpen) {
 
 function setSkyKind(kind) {
   skyDrawer.querySelectorAll('[data-sky-kind]').forEach(button => button.classList.toggle('is-active', button.dataset.skyKind === kind))
-  skyDrawer.querySelector('[data-birth-fields]').hidden = kind !== 'birth'
+  const birthFields = skyDrawer.querySelector('[data-birth-fields]')
+  birthFields.hidden = kind !== 'birth'
+  birthFields.querySelectorAll('input, select').forEach(input => { input.disabled = kind !== 'birth' })
   skyDrawer.dataset.kind = kind
   if (kind === 'live') skyDrawer.querySelector('[name="moment"]').value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+  updateBirthConfidence()
+}
+
+function updateBirthConfidence() {
+  const isBirth = skyDrawer.dataset.kind === 'birth'
+  const confidence = skyDrawer.querySelector('[name="confidence"]').value
+  const unknown = isBirth && confidence === 'unknown'
+  const coordinateFields = skyDrawer.querySelector('[data-coordinate-fields]')
+  coordinateFields.classList.toggle('is-withheld', unknown)
+  coordinateFields.querySelectorAll('input').forEach(input => { input.disabled = !isBirth || unknown })
+  skyDrawer.querySelector('[data-moment-label]').textContent = unknown ? 'Birth date · noon convention' : 'Moment in local time'
+  skyDrawer.querySelector('[data-time-convention]').textContent = unknown
+    ? 'The recorded time is not used. The planetary field is measured at 12:00 local time; angles and houses are withheld.'
+    : 'The chart is measured at the entered local clock time.'
 }
 
 function contactRows(contacts) {
@@ -625,7 +643,8 @@ async function calculateSky(event) {
   let houses = null
   try {
     if (kind === 'birth') {
-      moment = zonedDateTime(form.get('moment'), form.get('timezone'))
+      const localMoment = confidence === 'unknown' ? `${String(form.get('moment')).slice(0, 10)}T12:00` : form.get('moment')
+      moment = zonedDateTime(localMoment, String(form.get('timezone')).trim())
       if (confidence !== 'unknown') {
         if (form.get('latitude') === '' || form.get('longitude') === '') throw new Error('Confirmed coordinates are required for chart angles.')
         angles = chartAngles(moment, Number(form.get('latitude')), Number(form.get('longitude')))
@@ -707,6 +726,7 @@ document.querySelector('[data-chamber]').addEventListener('click', toggleChamber
 document.querySelector('[data-sky-open]').addEventListener('click', () => toggleSkyDrawer())
 document.querySelector('[data-sky-close]').addEventListener('click', () => toggleSkyDrawer(false))
 document.querySelectorAll('[data-sky-kind]').forEach(button => button.addEventListener('click', () => setSkyKind(button.dataset.skyKind)))
+document.querySelector('[name="confidence"]').addEventListener('change', updateBirthConfidence)
 document.querySelector('[data-sky-form]').addEventListener('submit', calculateSky)
 document.querySelector('[data-cancel-sky]').addEventListener('click', () => state.skyController?.abort())
 document.querySelector('[data-reference-chart]').addEventListener('click', () => {
