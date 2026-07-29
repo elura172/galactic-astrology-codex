@@ -6,6 +6,7 @@ import { chartAngles, houseForLongitude, lineageHouseResonance, MAJOR_BODIES, wh
 import { conjunction } from './astrology.js'
 import { angleContacts, crossChartActivations, densestCluster, planetaryCourts, populatedCourts, strongestChords } from './reading.js'
 import { chordTransmission, composeActivationTransmission, composeTransmission, finalSentence } from './synthesis.js'
+import { buildSynthesisPacket } from './synthesis-packet.js'
 
 const COLORS = [
   '#748c83', '#7893a3', '#9a7892', '#a45743', '#c29854',
@@ -593,30 +594,36 @@ function renderReadingFolio() {
   const evidence = [
     ...(cluster ? [{
       id: 'cluster:primary', kind: 'cluster', count: cluster.members.length,
+      canonicalSeats: cluster.seats,
       measurement: `${cluster.members.length} unique bodies within ${cluster.span.toFixed(3)}° centered at ${zodiacLabel(cluster.center)}`,
       themes: [...new Set(cluster.seats.map(seat => glyphByNumber.get(seat).function))].slice(0, 3),
       transmission: `The field gathers ${cluster.members.map(member => member.name).slice(0, 4).join(', ')}${cluster.members.length > 4 ? ', and their companions' : ''} into one council. Their offices ask to be received together before any one voice is interpreted alone.`,
     }] : []),
     ...populated.flatMap(court => court.contacts.map(contact => ({
       id: `court:${court.body.command}:${contact.glyph.number}`, kind: 'court', tier: contact.tier, orb: contact.orb,
+      canonicalSeats: [contact.glyph.number],
       measurement: `${contact.glyph.name} conjunct ${court.body.name} · orb ${contact.orb.toFixed(3)}°`,
       themes: [contact.glyph.function],
       transmission: `Within ${court.body.name}'s court, ${contact.glyph.name} carries the office of ${contact.glyph.function.toLowerCase()}. Notice where this function is already moving through the life, and where it is still asking for form.`,
     }))),
     ...angles.flatMap(angle => angle.contacts.map(contact => ({
       id: `angle:${angle.key}:${contact.glyph.number}`, kind: 'angle', tier: contact.tier, orb: contact.orb, confidence: angle.confidence,
+      canonicalSeats: [contact.glyph.number],
       measurement: `${contact.glyph.name} conjunct ${angle.label} · orb ${contact.orb.toFixed(3)}° · ${angle.confidence}`,
       themes: [contact.glyph.function],
       transmission: `At the ${angle.label}, ${contact.glyph.name} approaches the threshold with its office of ${contact.glyph.function.toLowerCase()}. Receive this as an orientation, not an instruction.`,
     }))),
     ...chordFamilies.flatMap(family => (chords.get(family) || []).map((chord, index) => ({
       id: `chord:${family}:${index}`, kind: 'chord', tier: chord.tier, orb: chord.orb,
+      chordFamily: family,
+      canonicalSeats: [chord.first.seat, chord.second.seat].filter(Number.isInteger),
       measurement: `${chord.first.label} ${family} ${chord.second.label} · orb ${chord.orb.toFixed(3)}°`,
       themes: [chord.first.label, chord.second.label],
       transmission: chordTransmission(family, chord.first.label, chord.second.label),
     }))),
   ]
   const synthesis = composeTransmission(evidence)
+  const synthesisPacket = buildSynthesisPacket({ chartKind: state.skyMode, angleConfidence: state.angleConfidence, evidence: synthesis.evidence, glyphs, groups: GROUPS, chords: CHORDS })
   const chartSentence = finalSentence(synthesis.evidence)
   const isNatal = state.skyMode === 'birth'
   folio.dataset.depth = 'essential'
@@ -641,9 +648,9 @@ function renderReadingFolio() {
       }).join('')}
     </section>
     <section class="synthesis-gate" id="folio-synthesis"><div class="folio-heading"><span>05</span><h4>Synthesis</h4><small>${synthesis.evidence.length} primary threads</small></div>
-      <div class="synthesis-threshold"><p>The following transmission is composed from the strongest measured relationships in this chart and the canonical offices they activate. It is offered as a mirror. Keep what brings recognition; leave what does not.</p><button data-receive-synthesis>Receive the synthesis <span>↓</span></button></div>
+      <div class="synthesis-threshold"><p>The following transmission is composed from the strongest measured relationships in this chart and the canonical offices they activate. It is offered as a mirror. Keep what brings recognition; leave what does not.</p><button type="button" data-receive-synthesis>Receive the synthesis <span>↓</span></button></div>
       <div class="transmission" data-transmission hidden><span>Transmission</span>${synthesis.passages.map(passage => `<p>${escapeHtml(passage)}</p>`).join('')}<blockquote class="chart-sentence">${escapeHtml(chartSentence)}</blockquote><p class="transmission-ground">What is measured creates the vessel. What is recognized remains yours to name.</p><details><summary>Open the evidence record</summary>${synthesis.evidence.map(item => `<p><b>${item.score}</b><span>${escapeHtml(item.measurement)}</span></p>`).join('')}</details></div>
-    </section><div class="folio-actions"><button data-print-folio>Print / save folio <span>PDF ↗</span></button><button class="technical-only" data-export-record>Export technical record <span>JSON ↓</span></button></div>`
+    </section><div class="folio-actions"><button type="button" data-print-folio>Print / save folio <span>PDF ↗</span></button><button type="button" class="technical-only" data-export-synthesis>Inspect synthesis packet <span>JSON ↓</span></button><button type="button" class="technical-only" data-export-record>Export technical record <span>JSON ↓</span></button></div>`
   folio.hidden = false
   folio.querySelectorAll('[data-folio-seat]').forEach(button => button.addEventListener('click', () => {
     selectGlyph(Number(button.dataset.folioSeat))
@@ -694,6 +701,12 @@ function renderReadingFolio() {
     }
     window.addEventListener('afterprint', restore)
     window.print()
+  })
+  folio.querySelector('[data-export-synthesis]').addEventListener('click', () => {
+    const url = URL.createObjectURL(new Blob([JSON.stringify(synthesisPacket, null, 2)], { type: 'application/json' }))
+    const anchor = Object.assign(document.createElement('a'), { href: url, download: `celestial-glyphs-synthesis-packet.json` })
+    anchor.click()
+    URL.revokeObjectURL(url)
   })
   folio.querySelector('[data-export-record]').addEventListener('click', () => {
     const record = technicalRecord({ timestamp: state.skyTimestamp, mode: state.skyMode, placements: state.skyPlacements, planets: state.majorPlacements, angles: state.chartAngles, houses: state.houses, angleConfidence: state.angleConfidence })
