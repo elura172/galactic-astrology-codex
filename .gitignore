@@ -9,3 +9,8 @@ files/natal_resonance_pass.md
 node_modules/
 dist/
 .cache/
+
+# Regenerable viewer (rebuild with: graphify export html)
+graphify-out/graph.html
+graphify-out/.graphify_python
+graphify-out/.graphify_root
