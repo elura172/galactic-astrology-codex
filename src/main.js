@@ -5,6 +5,7 @@ import { fetchEphemerisInBatches, placementsBySeat, technicalRecord, uniqueMeasu
 import { chartAngles, houseForLongitude, lineageHouseResonance, MAJOR_BODIES, wholeSignHouses, zonedDateTime } from './chart.js'
 import { conjunction } from './astrology.js'
 import { angleContacts, crossChartActivations, densestCluster, planetaryCourts, populatedCourts, strongestChords } from './reading.js'
+import { gateOccupancy, initiatoryWalk, officeBraid, silentGates } from './gates.js'
 import { chordTransmission, composeActivationTransmission, composeTransmission, finalSentence } from './synthesis.js'
 import { buildSynthesisPacket } from './synthesis-packet.js'
 
@@ -271,6 +272,11 @@ function skyLayer(selected) {
   })() : ''
   const highlight = state.skyHighlight?.type === 'cluster'
     ? `<path class="cluster-wash" d="${ringPath(365, 399, -90 + state.skyHighlight.center - state.skyHighlight.span / 2, -90 + state.skyHighlight.center + state.skyHighlight.span / 2)}"/>`
+    : state.skyHighlight?.type === 'gate' ? (() => {
+      const outer = polar(402, -90 + state.skyHighlight.longitude)
+      const inner = polar(342, -90 + state.skyHighlight.longitude)
+      return `<g class="gate-mark"><line x1="${inner.x}" y1="${inner.y}" x2="${outer.x}" y2="${outer.y}"/><text x="${outer.x}" y="${outer.y}">${escapeHtml(state.skyHighlight.label)}</text></g>`
+    })()
     : state.skyHighlight?.type === 'chord' ? (() => {
       const first = polar(370, -90 + state.skyHighlight.first.longitude)
       const second = polar(370, -90 + state.skyHighlight.second.longitude)
@@ -522,10 +528,21 @@ function updateBirthConfidence() {
 }
 
 function contactRows(contacts) {
-  return contacts.map(contact => `<button data-folio-seat="${contact.glyph.number}">
+  return contacts.map(contact => `<button type="button" data-folio-seat="${contact.glyph.number}">
     <span><b>${String(contact.glyph.number).padStart(3, '0')} · ${escapeHtml(contact.glyph.name)}</b><small>${zodiacLabel(contact.placement.longitude)} · orb ${contact.orb.toFixed(3)}° · ${contact.tier}</small></span>
     <em>${escapeHtml(contact.glyph.function)}</em>
   </button>`).join('')
+}
+
+// Gate contacts mix canonical seats with planets and angles, so they cannot reuse
+// contactRows: only a seat is selectable on the wheel.
+function gateContactRows(contacts) {
+  return contacts.map(contact => contact.kind === 'glyph'
+    ? `<button type="button" data-folio-seat="${contact.glyph.number}">
+        <span><b>${String(contact.glyph.number).padStart(3, '0')} · ${escapeHtml(contact.glyph.name)}</b><small>${zodiacLabel(contact.placement.longitude)} · orb ${contact.orb.toFixed(3)}° · ${contact.tier}</small></span>
+        <em>${escapeHtml(contact.glyph.function)}</em>
+      </button>`
+    : `<p class="gate-point"><span><b>${escapeHtml(contact.point.name)}</b><small>${zodiacLabel(contact.point.longitude)} · orb ${contact.orb.toFixed(3)}° · ${contact.tier}</small></span><em>${escapeHtml(contact.kind)}</em></p>`).join('')
 }
 
 function renderComparisonPanel() {
@@ -547,7 +564,7 @@ function renderComparisonPanel() {
   panel.innerHTML = `<header><span>Birth field beneath Live Sky</span><small>Birth field retained in memory only</small></header>
     <p class="comparison-intro">These are present contacts to the retained birth field, measured as activations rather than predictions.</p>
     <nav class="comparison-nav" aria-label="Move through live activations"><button type="button" data-comparison-prev aria-label="Previous activation">←</button><p aria-live="polite"><b>${escapeHtml(activeLabel)}</b><span>${active ? `Orb ${active.orb.toFixed(3)}° · ${active.tier}` : 'Measured silence'}</span></p><button type="button" data-comparison-next aria-label="Next activation">→</button></nav>
-    <div class="comparison-group"><h4>Glyph activations <small>${activations.glyphContacts.length} within 3°</small></h4>${glyphContacts.length ? glyphContacts.map((contact, index) => `<button class="${index === state.comparisonCursor ? 'is-active' : ''}" data-comparison-index="${index}" data-comparison-seat="${contact.natal.glyph.number}"><b>${escapeHtml(contact.live.name)} → ${String(contact.natal.glyph.number).padStart(3, '0')} · ${escapeHtml(contact.natal.glyph.name)}</b><span>Conjunction · orb ${contact.orb.toFixed(3)}° · ${contact.tier}</span></button>`).join('') : '<p>No live planet is within 3° of a natal glyph seat.</p>'}</div>
+    <div class="comparison-group"><h4>Glyph activations <small>${activations.glyphContacts.length} within 3°</small></h4>${glyphContacts.length ? glyphContacts.map((contact, index) => `<button type="button" class="${index === state.comparisonCursor ? 'is-active' : ''}" data-comparison-index="${index}" data-comparison-seat="${contact.natal.glyph.number}"><b>${escapeHtml(contact.live.name)} → ${String(contact.natal.glyph.number).padStart(3, '0')} · ${escapeHtml(contact.natal.glyph.name)}</b><span>Conjunction · orb ${contact.orb.toFixed(3)}° · ${contact.tier}</span></button>`).join('') : '<p>No live planet is within 3° of a natal glyph seat.</p>'}</div>
     <section class="activation-gate"><span>Present-field transmission</span><h4>What is being activated now?</h4><p>Composed only from the strongest contacts measured above. Receive it as weather, not prediction.</p><button type="button" data-receive-activation aria-expanded="false">Receive the activation <span>↓</span></button><div data-activation-transmission hidden>${transmission.passages.map(passage => `<p>${escapeHtml(passage)}</p>`).join('')}<blockquote>${escapeHtml(transmission.closing)}</blockquote><details><summary>Open the evidence</summary>${transmission.evidence.map(item => `<p><b>${escapeHtml(item.kind)}</b><span>${escapeHtml(item.measurement)}</span></p>`).join('')}</details></div></section>
     <div class="comparison-group"><h4>Planetary chords <small>${activations.planetaryChords.length} within 2°</small></h4>${planetaryChords.length ? planetaryChords.map(contact => `<p><b>${escapeHtml(contact.live.name)} ${contact.aspect} ${escapeHtml(contact.natal.name)}</b><span>Orb ${contact.orb.toFixed(3)}° · ${contact.tier}</span></p>`).join('') : '<p>No live-to-natal planetary chord is within 2°.</p>'}</div>
     <button class="comparison-forget" type="button" data-forget-birth>Forget retained birth field <span>×</span></button>`
@@ -591,6 +608,11 @@ function renderReadingFolio() {
   const anglePoints = state.chartAngles ? Object.entries({ Ascendant: state.chartAngles.ascendant, Midheaven: state.chartAngles.midheaven, Descendant: state.chartAngles.descendant, 'Imum Coeli': state.chartAngles.imumCoeli }).map(([label, longitude]) => ({ id: `angle:${label}`, kind: 'angle', label, longitude })) : []
   const chords = strongestChords([...uniqueGlyphPoints, ...planetPoints, ...anglePoints])
   const chordFamilies = ['Step', 'Gift', 'Vow', 'Spiral', 'Mirror']
+  const gatePoints = [...planetPoints, ...anglePoints].map(point => ({ name: point.label, kind: point.kind, longitude: point.longitude }))
+  const gates = gateOccupancy(glyphs, state.skyPlacements, gatePoints)
+  const walk = initiatoryWalk(gates)
+  const silentWalk = silentGates(gates)
+  const braid = officeBraid(gates)
   const evidence = [
     ...(cluster ? [{
       id: 'cluster:primary', kind: 'cluster', count: cluster.members.length,
@@ -613,6 +635,13 @@ function renderReadingFolio() {
       themes: [contact.glyph.function],
       transmission: `At the ${angle.label}, ${contact.glyph.name} approaches the threshold with its office of ${contact.glyph.function.toLowerCase()}. Receive this as an orientation, not an instruction.`,
     }))),
+    ...gates.filter(gate => !gate.silent).flatMap(gate => gate.contacts.filter(contact => contact.kind === 'glyph').map(contact => ({
+      id: `gate:${gate.gate}:${contact.glyph.number}`, kind: 'gate', tier: contact.tier, orb: contact.orb,
+      canonicalSeats: [contact.glyph.number],
+      measurement: `${contact.glyph.name} on the ${gate.name} · gate ${gate.gate} · orb ${contact.orb.toFixed(3)}°`,
+      themes: [contact.glyph.function],
+      transmission: `At the ${gate.name} — ${gate.phase.toLowerCase()} — the walk is met by ${contact.glyph.name}, carrying the office of ${contact.glyph.function.toLowerCase()}. This is the phase the sky speaks from, not a stage already completed.`,
+    }))),
     ...chordFamilies.flatMap(family => (chords.get(family) || []).map((chord, index) => ({
       id: `chord:${family}:${index}`, kind: 'chord', tier: chord.tier, orb: chord.orb,
       chordFamily: family,
@@ -627,9 +656,9 @@ function renderReadingFolio() {
   const chartSentence = finalSentence(synthesis.evidence)
   const isNatal = state.skyMode === 'birth'
   folio.dataset.depth = 'essential'
-  folio.innerHTML = `<nav class="folio-depth" aria-label="Reading depth"><button class="is-active" data-folio-depth="essential">Essential</button><button data-folio-depth="full">Full folio</button><button data-folio-depth="technical">Technical</button></nav>
+  folio.innerHTML = `<nav class="folio-depth" aria-label="Reading depth"><button type="button" class="is-active" data-folio-depth="essential">Essential</button><button type="button" data-folio-depth="full">Full folio</button><button type="button" data-folio-depth="technical">Technical</button></nav>
     <header><span>${isNatal ? 'Natal' : 'Live'} result folio</span><h3 tabindex="-1">Measured correspondences</h3><p>Measurement and canonical interpretation remain separate registers.</p></header>
-    <nav class="folio-index" aria-label="Folio sections"><button data-folio-jump="courts">Courts</button><button data-folio-jump="angles">Angles</button><button data-folio-jump="cluster">Cluster</button><button data-folio-jump="chords">Chords</button><button data-folio-jump="synthesis">Synthesis</button></nav>
+    <nav class="folio-index" aria-label="Folio sections"><button type="button" data-folio-jump="courts">Courts</button><button type="button" data-folio-jump="angles">Angles</button><button type="button" data-folio-jump="cluster">Cluster</button><button type="button" data-folio-jump="gates">Gates</button><button type="button" data-folio-jump="chords">Chords</button><button type="button" data-folio-jump="synthesis">Synthesis</button></nav>
     <section class="essential-record"><div class="folio-heading"><span>✦</span><h4>Strongest evidence</h4><small>${synthesis.evidence.length} threads</small></div>${synthesis.evidence.map(item => `<p><b>${item.kind}</b><span>${escapeHtml(item.measurement)}</span></p>`).join('')}</section>
     <section class="folio-full" id="folio-courts"><div class="folio-heading"><span>01</span><h4>Planetary courts</h4><small>${populated.length} populated</small></div>
       ${populated.length ? populated.map(court => `<article><h5>${court.body.symbol} ${court.body.name}'s Court <small>${zodiacLabel(court.planet.longitude)}</small></h5>${contactRows(court.contacts)}</article>`).join('') : '<p class="folio-silence">No glyph lies within the declared 3° conjunction range of a planetary point.</p>'}
@@ -639,15 +668,27 @@ function renderReadingFolio() {
       ${angles.length ? angles.map(angle => `<article class="angle-record${angle.confidence === 'approximate' ? ' is-approximate' : ''}"><h5>${angle.label} <small>${zodiacLabel(angle.longitude)} · ${angle.confidence}</small></h5>${angle.contacts.length ? contactRows(angle.contacts) : '<p class="folio-silence">No glyph within 3° · measured silence</p>'}</article>`).join('') : `<p class="folio-silence">${isNatal ? 'Birth time unknown: angle claims are suppressed.' : 'Angles belong to a located chart and are not inferred for the geocentric live field.'}</p>`}
     </section>
     <section class="folio-full" id="folio-cluster"><div class="folio-heading"><span>03</span><h4>The densest gathering</h4><small>${cluster?.members.length || 0} bodies</small></div>
-      ${cluster ? `<article class="cluster-record"><h5>${zodiacLabel(cluster.center)} <small>${cluster.span.toFixed(3)}° span · ${cluster.countingRule}</small></h5><p>${cluster.members.map(member => escapeHtml(member.name)).join(' · ')}</p><p class="cluster-seats">Canonical seats ${cluster.seats.map(seat => String(seat).padStart(3, '0')).join(' · ')}</p><button class="folio-reveal" data-reveal-cluster>Reveal gathering on wheel <span>↗</span></button></article>` : '<p class="folio-silence">No measured glyph field available.</p>'}
+      ${cluster ? `<article class="cluster-record"><h5>${zodiacLabel(cluster.center)} <small>${cluster.span.toFixed(3)}° span · ${cluster.countingRule}</small></h5><p>${cluster.members.map(member => escapeHtml(member.name)).join(' · ')}</p><p class="cluster-seats">Canonical seats ${cluster.seats.map(seat => String(seat).padStart(3, '0')).join(' · ')}</p><button type="button" class="folio-reveal" data-reveal-cluster>Reveal gathering on wheel <span>↗</span></button></article>` : '<p class="folio-silence">No measured glyph field available.</p>'}
     </section>
-    <section class="folio-full" id="folio-chords"><div class="folio-heading"><span>04</span><h4>The chord lattice</h4><small>strongest by family</small></div>
+    <section class="folio-full" id="folio-gates"><div class="folio-heading"><span>04</span><h4>The ten gates</h4><small>${10 - silentWalk.length} of 10 speaking</small></div>
+      <p class="gate-walk"><b>The Initiatory Walk</b> ${walk.ringOrder.join(' → ')} · ${walk.courseCrossings} course crossing${walk.courseCrossings === 1 ? '' : 's'}${walk.opensAt ? ` · the chart begins its speech at the ${escapeHtml(walk.opensAt.name)}` : ''}</p>
+      ${walk.steps.map(gate => `<article class="chord-family gate-record${gate.silent ? ' is-silent' : ''}">
+        <h5><span><b>${String(gate.gate).padStart(2, '0')}</b>${escapeHtml(gate.name)}</span><small>${zodiacLabel(gate.longitude)} · Ring ${gate.ring} · ${gate.course} · ${gate.anchor}</small></h5>
+        <p class="gate-phase">${escapeHtml(gate.phase)}</p>
+        ${gate.silent
+          ? '<p class="folio-silence">No body within 3° · measured silence, recorded as part of the walk</p>'
+          : `${gateContactRows(gate.contacts)}<button type="button" class="folio-reveal" data-reveal-gate="${gate.gate}">Reveal gate on wheel <span>↗</span></button>`}
+      </article>`).join('')}
+      ${silentWalk.length ? `<p class="folio-silence"><b>Silent gates</b> ${silentWalk.map(gate => `${escapeHtml(gate.name)} · ${escapeHtml(gate.phase.split(':')[0])}`).join(' — ')}</p>` : ''}
+      ${braid.length ? `<article class="cluster-record gate-braid"><h5>The office braid <small>rings the walk names, most repeated first</small></h5><ol>${braid.map(entry => `<li><b>Ring ${entry.ring} · ${escapeHtml(entry.office)}</b><span>${entry.gates.map(gate => escapeHtml(gate)).join(' · ')}</span><small>${entry.seats.length} seat${entry.seats.length === 1 ? '' : 's'} · tightest orb ${entry.tightestOrb.toFixed(3)}°${entry.atHomeGate ? ' · standing at its own gate' : ''}</small></li>`).join('')}</ol></article>` : ''}
+    </section>
+    <section class="folio-full" id="folio-chords"><div class="folio-heading"><span>05</span><h4>The chord lattice</h4><small>strongest by family</small></div>
       ${chordFamilies.map(family => {
         const familyChords = chords.get(family) || []
-        return `<article class="chord-family"><h5>${family} <small>${familyChords.length ? `${familyChords.length} strongest` : 'silent'}</small></h5>${familyChords.length ? familyChords.map((chord, index) => `<button data-reveal-chord="${family}:${index}"><span><b>${escapeHtml(chord.first.label)} ↔ ${escapeHtml(chord.second.label)}</b><small>${chord.separation.toFixed(3)}° separation · orb ${chord.orb.toFixed(3)}°</small></span><em>${chord.tier}</em></button>`).join('') : '<p class="folio-silence">No chord within 2° of this family.</p>'}</article>`
+        return `<article class="chord-family"><h5>${family} <small>${familyChords.length ? `${familyChords.length} strongest` : 'silent'}</small></h5>${familyChords.length ? familyChords.map((chord, index) => `<button type="button" data-reveal-chord="${family}:${index}"><span><b>${escapeHtml(chord.first.label)} ↔ ${escapeHtml(chord.second.label)}</b><small>${chord.separation.toFixed(3)}° separation · orb ${chord.orb.toFixed(3)}°</small></span><em>${chord.tier}</em></button>`).join('') : '<p class="folio-silence">No chord within 2° of this family.</p>'}</article>`
       }).join('')}
     </section>
-    <section class="synthesis-gate" id="folio-synthesis"><div class="folio-heading"><span>05</span><h4>Synthesis</h4><small>${synthesis.evidence.length} primary threads</small></div>
+    <section class="synthesis-gate" id="folio-synthesis"><div class="folio-heading"><span>06</span><h4>Synthesis</h4><small>${synthesis.evidence.length} primary threads</small></div>
       <div class="synthesis-threshold"><p>The following transmission is composed from the strongest measured relationships in this chart and the canonical offices they activate. It is offered as a mirror. Keep what brings recognition; leave what does not.</p><button type="button" data-receive-synthesis>Receive the synthesis <span>↓</span></button></div>
       <div class="transmission" data-transmission hidden><span>Transmission</span>${synthesis.passages.map(passage => `<p>${escapeHtml(passage)}</p>`).join('')}<blockquote class="chart-sentence">${escapeHtml(chartSentence)}</blockquote><p class="transmission-ground">What is measured creates the vessel. What is recognized remains yours to name.</p><details><summary>Open the evidence record</summary>${synthesis.evidence.map(item => `<p><b>${item.score}</b><span>${escapeHtml(item.measurement)}</span></p>`).join('')}</details></div>
     </section><div class="folio-actions"><button type="button" data-print-folio>Print / save folio <span>PDF ↗</span></button><button type="button" class="technical-only" data-export-synthesis>Inspect synthesis packet <span>JSON ↓</span></button><button type="button" class="technical-only" data-export-record>Export technical record <span>JSON ↓</span></button></div>`
@@ -673,6 +714,12 @@ function renderReadingFolio() {
     renderMandala()
     toggleSkyDrawer(false)
   })
+  folio.querySelectorAll('[data-reveal-gate]').forEach(button => button.addEventListener('click', () => {
+    const gate = gates.find(candidate => candidate.gate === Number(button.dataset.revealGate))
+    state.skyHighlight = { type: 'gate', longitude: gate.longitude, label: `${gate.gate}. ${gate.name}` }
+    renderMandala()
+    toggleSkyDrawer(false)
+  }))
   folio.querySelectorAll('[data-reveal-chord]').forEach(button => button.addEventListener('click', () => {
     const [family, index] = button.dataset.revealChord.split(':')
     const chord = chords.get(family)[Number(index)]

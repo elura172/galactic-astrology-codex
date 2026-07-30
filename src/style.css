@@ -374,6 +374,9 @@ input:focus-visible,
 .angle-mark.is-approximate { stroke-dasharray: 2 3; opacity: .55; }
 .house-mark { stroke: rgba(182,139,58,.62); stroke-width: .8; }
 .house-mark text { fill: var(--gold); stroke: none; font: 6px var(--mono); text-anchor: middle; }
+.gate-mark { stroke: var(--violet); stroke-width: 1.4; }
+.gate-mark line { stroke-dasharray: 7 4; }
+.gate-mark text { fill: var(--violet); stroke: none; font: 6px var(--mono); font-weight: 600; letter-spacing: .06em; }
 .cluster-wash { fill: rgba(164,99,112,.2); stroke: var(--rose); stroke-width: .8; }
 .measured-chord { fill: none; stroke: var(--gold); stroke-width: 1.6; vector-effect: non-scaling-stroke; }
 .measured-chord--step { stroke-width: 1; }
@@ -554,6 +557,23 @@ input:focus-visible,
 .cluster-record .cluster-seats { color: var(--quiet); font: 7px/1.6 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
 .folio-reveal { display: flex !important; grid-template-columns: none !important; justify-content: space-between; margin-top: 10px; padding: 10px !important; border: 1px solid var(--ink) !important; font: 7px var(--mono); letter-spacing: .1em; text-transform: uppercase; }
 .chord-family > .folio-silence { padding: 5px 0; }
+.gate-walk { margin: 0 0 14px; padding: 11px 25px; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); color: var(--quiet); font: 8px/1.7 var(--mono); letter-spacing: .07em; text-transform: uppercase; }
+.gate-walk b { display: block; margin-bottom: 4px; color: var(--violet); letter-spacing: .14em; }
+.gate-record h5 > span { display: flex; flex: 1 1 auto; align-items: baseline; gap: 8px; min-width: 0; }
+.gate-record h5 b { flex: none; color: var(--violet); font: 9px var(--mono); }
+.gate-record h5 small { flex: 0 1 auto; }
+.gate-record .gate-phase { margin: 0 0 8px; color: var(--ink); font: italic 12px/1.45 var(--serif); }
+.gate-record.is-silent { opacity: .62; }
+.gate-record.is-silent h5 b { color: var(--quiet); }
+.gate-point { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin: 0; padding: 9px 0; border-top: 1px solid var(--rule); }
+.gate-point b { display: block; font: 10px var(--sans); font-weight: 600; }
+.gate-point small { color: var(--quiet); font: 7px var(--mono); letter-spacing: .06em; }
+.gate-point em { align-self: center; color: var(--violet); font: 7px var(--mono); text-align: right; text-transform: uppercase; }
+.gate-braid ol { margin: 10px 0 0; padding: 0; list-style: none; }
+.gate-braid li { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; padding: 9px 0; border-top: 1px solid var(--rule); }
+.gate-braid li b { font: 10px var(--sans); font-weight: 600; }
+.gate-braid li span { grid-column: 1; color: var(--violet); font: 7px var(--mono); letter-spacing: .07em; text-transform: uppercase; }
+.gate-braid li small { grid-column: 2; grid-row: 1 / span 2; align-self: center; color: var(--quiet); font: 7px/1.5 var(--mono); text-align: right; }
 .chord-family article button em, .chord-family button em { align-self: center; color: var(--quiet); font: 7px var(--mono); text-align: right; text-transform: uppercase; }
 .synthesis-threshold { padding: 24px 25px; background: linear-gradient(135deg, rgba(182,139,58,.08), transparent 58%); }
 .synthesis-threshold > p { margin: 0 0 20px; font: italic 18px/1.5 var(--serif); }
