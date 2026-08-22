@@ -40,9 +40,18 @@ async function placement(body, timestamp) {
   const cached = memo.get(key)
   if (cached) return { ...cached, seat: body.seat ?? null, name: body.name ?? null }
 
-  const response = await fetch(horizonsUrl(body.command, timestamp), { signal: AbortSignal.timeout(20000) })
-  if (!response.ok) throw new Error(`Horizons request failed with HTTP ${response.status}.`)
-  const position = parseHorizonsPlacement(await response.json())
+  // Horizons is a shared public service and throttles a burst; a 429 or a 5xx
+  // means wait, not fail. Without this one throttled body fails a whole batch,
+  // which the client then reports as a lost reading.
+  let payload
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (attempt) await new Promise(resolve => setTimeout(resolve, 500 * 2 ** (attempt - 1)))
+    const response = await fetch(horizonsUrl(body.command, timestamp), { signal: AbortSignal.timeout(20000) })
+    if (response.ok) { payload = await response.json(); break }
+    if (response.status !== 429 && response.status < 500) throw new Error(`Horizons request failed with HTTP ${response.status}.`)
+    if (attempt === 2) throw new Error(`Horizons is unavailable (HTTP ${response.status}).`)
+  }
+  const position = parseHorizonsPlacement(payload)
   const result = {
     command: body.command, ...position, timestamp,
     center: 'geocentric', frame: 'apparent ecliptic-of-date', source: 'NASA/JPL Horizons',

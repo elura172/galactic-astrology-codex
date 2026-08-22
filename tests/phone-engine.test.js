@@ -184,3 +184,50 @@ test('functions handed an ISO timestamp survive the canonical julianDate signatu
   assert.ok(engine.planetLongitudes(instant).every(p => Number.isFinite(p.longitude)))
   assert.ok(Number.isFinite(engine.moonLongitude(instant)))
 })
+
+test('a flaky batch is retried rather than costing the whole reading', async () => {
+  // The failure this guards: one batch of twelve failing threw out every real
+  // placement and fell back to fixtures, so the app rendered a complete-looking
+  // reading of illustrative numbers with only a sentence in the note to say so.
+  const realFetch = globalThis.fetch
+  let calls = 0
+  globalThis.fetch = async (url, options) => {
+    calls += 1
+    const { bodies, timestamp } = JSON.parse(options.body)
+    if (calls === 2) return { ok: false, status: 503, json: async () => ({ error: 'busy' }) }
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        timestamp,
+        placements: bodies.map((b, i) => ({ command: b.command, name: b.name, longitude: (i * 7) % 360, latitude: 0 })),
+      }),
+    }
+  }
+  try {
+    const longitudes = await engine.fetchGlyphLongitudes(glyphs, INSTANT, '/api/ephemeris')
+    const expected = engine.uniqueBodies(glyphs).length
+    assert.equal(longitudes.placements.length, expected, 'every body survives a transient failure')
+    assert.ok(calls > Math.ceil(expected / 8), 'the failed batch was retried')
+  } finally {
+    globalThis.fetch = realFetch
+  }
+})
+
+test('a refused request is not retried forever', async () => {
+  const realFetch = globalThis.fetch
+  let calls = 0
+  globalThis.fetch = async () => {
+    calls += 1
+    return { ok: false, status: 400, json: async () => ({ error: 'Every body requires a numeric Horizons command.' }) }
+  }
+  try {
+    await assert.rejects(
+      engine.fetchGlyphLongitudes(glyphs, INSTANT, '/api/ephemeris'),
+      /numeric Horizons command/,
+    )
+    assert.equal(calls, 1, 'a 400 is final — retrying it only delays the fallback')
+  } finally {
+    globalThis.fetch = realFetch
+  }
+})

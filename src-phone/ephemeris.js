@@ -33,18 +33,42 @@ export function uniqueBodies(glyphs) {
   })
   return [...byCommand.values()]
 }
+// One batch of twelve failing used to discard every real placement and quietly
+// substitute fixtures — a whole reading of illustrative numbers, announced only
+// by one sentence in the note. A cold service, a Horizons hiccup or a rate limit
+// is a reason to wait and ask again, not to abandon the sky.
+async function fetchBatch(endpoint, timestamp, batch, attempts = 3) {
+  let last
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (attempt) await new Promise(resolve => setTimeout(resolve, 400 * 2 ** (attempt - 1)))
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ timestamp, bodies: batch }),
+        signal: AbortSignal.timeout(30000),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) return data
+      // A refused request is final; a busy or broken service is worth retrying.
+      // Marked on the error rather than inferred from its message, because the
+      // message is the service's own text and cannot be pattern-matched.
+      const error = new Error(data.error || `ephemeris failed (HTTP ${res.status})`)
+      error.final = res.status !== 429 && res.status !== 408 && res.status < 500
+      throw error
+    } catch (error) {
+      if (error.final) throw error
+      last = error
+    }
+  }
+  throw last
+}
+
 export async function fetchGlyphLongitudes(glyphs, timestamp, endpoint) {
   const bodies = uniqueBodies(glyphs)
   const lonByName = new Map()
   const placements = []
   for (let i = 0; i < bodies.length; i += 8) {
-    const res = await fetch(endpoint, {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ timestamp, bodies: bodies.slice(i, i + 8) }),
-      signal: AbortSignal.timeout(30000),
-    })
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.error || 'ephemeris failed')
+    const data = await fetchBatch(endpoint, timestamp, bodies.slice(i, i + 8))
     data.placements.forEach(p => {
       if (!lonByName.has(p.name)) lonByName.set(p.name, p.longitude)
       placements.push({ command: p.command, name: p.name, longitude: p.longitude, latitude: p.latitude })

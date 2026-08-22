@@ -1082,7 +1082,7 @@ class Component extends DCLogic {
         glyphSource = 'NASA/JPL Horizons, fetched directly';
       } catch (e2) {
         lonByName = this.mod.fixtureLongitudes(glyphs);
-        glyphSource = 'sample fixture \u2014 this preview sandbox blocks outbound calls to Horizons; the direct fetch works when the app runs standalone or in production';
+        glyphSource = 'sample fixture \u2014 illustrative positions, not this sky. The reading could not reach the Codex ephemeris service, and JPL Horizons cannot be read from a browser directly';
       }
     }
     this.setState({ ephProgress: '' });
