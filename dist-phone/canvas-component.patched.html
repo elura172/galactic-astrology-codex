@@ -607,9 +607,8 @@ a:hover { color:#0A0E15; }
 @keyframes glcx-spin { from { transform:rotateY(0deg); } to { transform:rotateY(360deg); } }
 </style>
 </helmet>
-<div style="min-height:100vh; display:flex; align-items:center; justify-content:center; padding:48px 24px; background:#EDE2CC;">
-<x-import component-from-global-scope="IOSDevice" from="113c6c31-a0db-4921-87d5-5f7661873355#/ios-frame.jsx" hint-size="430px,880px">
-<div style="position:relative; width:100%; height:100%; background:#F1E8D6; color:#0A0E15; font-family:'Spectral',Georgia,serif; display:flex; flex-direction:column; overflow:hidden;">
+<div style="min-height:100vh; min-height:100dvh; width:100%; display:flex; justify-content:center; background:#EDE2CC;">
+<div style="position:relative; width:100%; max-width:560px; min-height:100vh; min-height:100dvh; background:#F1E8D6; color:#0A0E15; font-family:'Spectral',Georgia,serif; display:flex; flex-direction:column; overflow:hidden;">
 
   <!-- ======================= THRESHOLD ======================= -->
   <sc-if value="{{ showThreshold }}" hint-placeholder-val="{{ false }}">
@@ -629,7 +628,7 @@ a:hover { color:#0A0E15; }
 
   <!-- ======================= WHEEL ======================= -->
   <sc-if value="{{ showWheel }}" hint-placeholder-val="{{ true }}">
-  <div data-screen-label="Wheel" style="flex:1; overflow-y:auto; padding:72px 28px 56px;">
+  <div data-screen-label="Wheel" style="flex:1; overflow-y:auto; padding:calc(72px + env(safe-area-inset-top)) 28px 56px;">
     <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px;">
       <div style="font-family:'Cormorant Garamond',serif; font-size:11px; font-weight:500; letter-spacing:0.18em; text-transform:uppercase; color:#7A7466;">Spiral of Cellular Light</div>
       <div style="font-size:11px; color:#7A7466;">108 · 99 · 9</div>
@@ -679,7 +678,7 @@ a:hover { color:#0A0E15; }
 
   <!-- ======================= RING ======================= -->
   <sc-if value="{{ showRing }}" hint-placeholder-val="{{ false }}">
-  <div data-screen-label="Ring" style="flex:1; overflow-y:auto; padding:68px 28px 56px; animation:glcx-fadein 700ms cubic-bezier(0.2,0.6,0.2,1);">
+  <div data-screen-label="Ring" style="flex:1; overflow-y:auto; padding:calc(68px + env(safe-area-inset-top)) 28px 56px; animation:glcx-fadein 700ms cubic-bezier(0.2,0.6,0.2,1);">
     <div sc-camel-on-click="{{ closeRing }}" style="display:inline-flex; align-items:center; cursor:pointer; min-height:44px; font-family:'Cormorant Garamond',serif; font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:#7A7466;" style-hover="color:#B98438;">← The Wheel</div>
     <div style="margin-top:48px; font-size:11px; color:#7A7466;">Ring {{ ring.short }} · {{ ring.lineage }} · Gate: {{ ring.gate }}</div>
     <h1 style="margin:12px 0 0; font-family:'Cormorant Garamond',serif; font-weight:300; font-size:32px; line-height:1.12; letter-spacing:-0.015em; text-wrap:balance;">{{ ring.name }}</h1>
@@ -702,7 +701,7 @@ a:hover { color:#0A0E15; }
   <!-- ======================= GLYPH CHAMBER ======================= -->
   <sc-if value="{{ showGlyph }}" hint-placeholder-val="{{ false }}">
   <div data-screen-label="Glyph Chamber" style="flex:1; overflow-y:auto;">
-    <div style="padding:64px 28px 56px; animation:glcx-fadein 700ms cubic-bezier(0.2,0.6,0.2,1);">
+    <div style="padding:calc(64px + env(safe-area-inset-top)) 28px 56px; animation:glcx-fadein 700ms cubic-bezier(0.2,0.6,0.2,1);">
       <div sc-camel-on-click="{{ closeGlyph }}" style="display:inline-flex; align-items:center; cursor:pointer; min-height:44px; font-family:'Cormorant Garamond',serif; font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:#7A7466;" style-hover="color:#B98438;">← {{ glyphRingShort }}</div>
       <div style="margin-top:48px; display:flex; justify-content:center;">
         <div style="width:116px; height:116px; background-image:url('{{ glyphSigil }}'); background-size:contain; background-repeat:no-repeat; background-position:center;"></div>
@@ -760,7 +759,7 @@ a:hover { color:#0A0E15; }
 
   <!-- ======================= LINEAGES ======================= -->
   <sc-if value="{{ showLineages }}" hint-placeholder-val="{{ false }}">
-  <div data-screen-label="Lineages" style="flex:1; overflow-y:auto; padding:72px 28px 56px;">
+  <div data-screen-label="Lineages" style="flex:1; overflow-y:auto; padding:calc(72px + env(safe-area-inset-top)) 28px 56px;">
     <h1 style="margin:0; font-family:'Cormorant Garamond',serif; font-weight:300; font-size:36px; letter-spacing:-0.015em;">The Twelve Star Lineages</h1>
     <p style="margin:14px 0 0; font-size:13px; line-height:1.75; font-style:italic; color:#7A7466; max-width:44ch;">The braid is where a lineage stands; the echoes are where it sings.</p>
     <div style="margin-top:48px; border-top:1px solid rgba(10,14,21,0.10); display:flex; flex-direction:column;">
@@ -781,7 +780,7 @@ a:hover { color:#0A0E15; }
   <!-- ======================= LINEAGE PROFILE ======================= -->
   <sc-if value="{{ showLineage }}" hint-placeholder-val="{{ false }}">
   <div data-screen-label="Lineage Profile" style="flex:1; overflow-y:auto; overflow-x:hidden;">
-    <div style="padding:64px 28px 56px; position:relative; animation:glcx-fadein 700ms cubic-bezier(0.2,0.6,0.2,1);">
+    <div style="padding:calc(64px + env(safe-area-inset-top)) 28px 56px; position:relative; animation:glcx-fadein 700ms cubic-bezier(0.2,0.6,0.2,1);">
       <div style="position:absolute; top:20px; left:50%; width:480px; height:480px; margin-left:-240px; background-image:url('{{ linSigilFaint }}'); background-size:contain; background-repeat:no-repeat; background-position:center; pointer-events:none;"></div>
       <div sc-camel-on-click="{{ closeLineage }}" style="position:relative; display:inline-flex; align-items:center; cursor:pointer; min-height:44px; font-family:'Cormorant Garamond',serif; font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:#7A7466;" style-hover="color:#B98438;">← The Twelve</div>
       <div style="margin-top:80px; position:relative; text-align:center; font-size:11px; color:#7A7466;">{{ lin.subtitle }}</div>
@@ -834,7 +833,7 @@ a:hover { color:#0A0E15; }
 
   <!-- ======================= CHORDS ======================= -->
   <sc-if value="{{ showChords }}" hint-placeholder-val="{{ false }}">
-  <div data-screen-label="Chords" style="flex:1; overflow-y:auto; padding:72px 28px 56px;">
+  <div data-screen-label="Chords" style="flex:1; overflow-y:auto; padding:calc(72px + env(safe-area-inset-top)) 28px 56px;">
     <h1 style="margin:0; font-family:'Cormorant Garamond',serif; font-weight:300; font-size:36px; letter-spacing:-0.015em;">The Five Chords</h1>
     <p style="margin:14px 0 0; font-size:13px; line-height:1.75; font-style:italic; color:#7A7466; max-width:44ch;">The decagon’s native grammar — every angle a multiple of 36°. The wheel of vow has no square and no trine.</p>
     <div style="margin-top:56px; display:flex; flex-direction:column;">
@@ -861,7 +860,7 @@ a:hover { color:#0A0E15; }
   <!-- ======================= READING ======================= -->
   <sc-if value="{{ showReading }}" hint-placeholder-val="{{ false }}">
   <div data-screen-label="Reading" style="flex:1; overflow-y:auto;">
-    <div style="padding:72px 28px 56px;">
+    <div style="padding:calc(72px + env(safe-area-inset-top)) 28px 56px;">
       <div style="font-size:11px; color:#7A7466;">Natal Resonance Pass</div>
       <h1 style="margin:12px 0 0; font-family:'Cormorant Garamond',serif; font-weight:300; font-size:34px; line-height:1.1; letter-spacing:-0.015em; text-wrap:balance;">The 108 Glyphs in your sky</h1>
       <p style="margin:16px 0 0; font-size:13px; line-height:1.8; color:#565047; max-width:48ch;">Each seat names a real minor planet. The reading computes its measured position for your birth instant — the seat order is an interpretive index, never a substitute for the sky.</p>
@@ -1014,7 +1013,7 @@ a:hover { color:#0A0E15; }
   </sc-if>
 
   <!-- ======================= TAB BAR ======================= -->
-  <div style="flex:none; display:flex; border-top:1px solid rgba(10,14,21,0.10); background:rgba(241,232,214,0.94); backdrop-filter:blur(8px);">
+  <div style="flex:none; display:flex; border-top:1px solid rgba(10,14,21,0.10); background:rgba(241,232,214,0.94); backdrop-filter:blur(8px); padding-bottom:env(safe-area-inset-bottom);">
     <sc-for list="{{ tabs }}" as="tb" hint-placeholder-count="3">
       <div sc-camel-on-click="{{ tb.go }}" style="flex:1; min-height:56px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; cursor:pointer; padding-bottom:6px;">
         <div style="width:20px; height:1px; background:{{ tb.rule }};"></div>
@@ -1024,10 +1023,9 @@ a:hover { color:#0A0E15; }
   </div>
 
 </div>
-</x-import>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script="" data-props="{&quot;$preview&quot;: {&quot;width&quot;: 520, &quot;height&quot;: 980}, &quot;ephemerisEndpoint&quot;: {&quot;editor&quot;: &quot;text&quot;, &quot;default&quot;: &quot;/api/ephemeris&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Reading&quot;}}">
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;ephemerisEndpoint&quot;: {&quot;editor&quot;: &quot;text&quot;, &quot;default&quot;: &quot;/api/ephemeris&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Reading&quot;}}">
 class Component extends DCLogic {
   state = { tab: 'wheel', ringIndex: null, seat: null, lineage: null, begun: false, glyphs: [], lineages: [], formNotice: '', threshold: !localStorage.getItem('glcx_threshold_crossed') };
 
