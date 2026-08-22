@@ -9,7 +9,7 @@
 // app itself; they are sent anyway so the canvas editor (a different origin)
 // can point `ephemerisEndpoint` here while a design is being worked on.
 
-import { horizonsUrl, mapConcurrent, parseHorizonsPlacement } from '../server/horizons.js'
+import { CENTERS, horizonsUrl, mapConcurrent, parseHorizonsPlacement } from '../server/horizons.js'
 
 // A placement for a fixed body at a fixed instant never changes, so anything
 // already fetched can be answered from memory. Per-instance and lost on a cold
@@ -32,11 +32,13 @@ function validate(body) {
   body.bodies.forEach(item => {
     if (!/^\d+;?$/.test(item?.command)) throw new Error('Every body requires a numeric Horizons command.')
   })
-  return { timestamp: timestamp.toISOString(), bodies: body.bodies }
+  const frame = body.frame || 'heliocentric'
+  if (!CENTERS[frame]) throw new Error('Frame must be heliocentric or geocentric.')
+  return { timestamp: timestamp.toISOString(), bodies: body.bodies, frame }
 }
 
-async function placement(body, timestamp) {
-  const key = `${body.command}|${timestamp}`
+async function placement(body, timestamp, frame) {
+  const key = `${body.command}|${timestamp}|${frame}`
   const cached = memo.get(key)
   if (cached) return { ...cached, seat: body.seat ?? null, name: body.name ?? null }
 
@@ -46,7 +48,7 @@ async function placement(body, timestamp) {
   let payload
   for (let attempt = 0; attempt < 3; attempt += 1) {
     if (attempt) await new Promise(resolve => setTimeout(resolve, 500 * 2 ** (attempt - 1)))
-    const response = await fetch(horizonsUrl(body.command, timestamp), { signal: AbortSignal.timeout(20000) })
+    const response = await fetch(horizonsUrl(body.command, timestamp, frame), { signal: AbortSignal.timeout(20000) })
     if (response.ok) { payload = await response.json(); break }
     if (response.status !== 429 && response.status < 500) throw new Error(`Horizons request failed with HTTP ${response.status}.`)
     if (attempt === 2) throw new Error(`Horizons is unavailable (HTTP ${response.status}).`)
@@ -54,7 +56,7 @@ async function placement(body, timestamp) {
   const position = parseHorizonsPlacement(payload)
   const result = {
     command: body.command, ...position, timestamp,
-    center: 'geocentric', frame: 'apparent ecliptic-of-date', source: 'NASA/JPL Horizons',
+    center: frame, origin: CENTERS[frame], frame: 'apparent ecliptic-of-date', source: 'NASA/JPL Horizons',
   }
   if (memo.size >= MEMO_LIMIT) memo.clear()
   memo.set(key, result)
@@ -73,12 +75,12 @@ export default async function handler(request, response) {
     const input = validate(body)
     // Two at a time: Horizons is a shared public service and the client already
     // batches, so this stays polite without making a reading feel slow.
-    const placements = await mapConcurrent(input.bodies, 2, item => placement(item, input.timestamp))
+    const placements = await mapConcurrent(input.bodies, 2, item => placement(item, input.timestamp, input.frame))
     // An ephemeris for a past instant is immutable; let the CDN and the browser
     // keep it. Readings for "now" vary by the minute, which the timestamp in the
     // request body already distinguishes.
     response.setHeader('cache-control', 'public, max-age=31536000, immutable')
-    return response.status(200).json({ timestamp: input.timestamp, placements, source: 'NASA/JPL Horizons' })
+    return response.status(200).json({ timestamp: input.timestamp, frame: input.frame, placements, source: 'NASA/JPL Horizons' })
   } catch (error) {
     response.setHeader('cache-control', 'no-store')
     return response.status(400).json({ error: error.message })

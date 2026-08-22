@@ -1217,17 +1217,32 @@ function helioXYZ(el, T) {
     (sw * sI) * xp + (cw * sI) * yp,
   ]
 }
-// Sun + nine planets, geocentric apparent-ish ecliptic longitude of date (Keplerian; ~arcminute accuracy, no Moon)
-export function planetLongitudes(iso) {
+// Heliocentric by default: `helioXYZ` already returns Sun-centred vectors, so a
+// heliocentric longitude is simply that vector's angle — the geocentric one was
+// the same vector with Earth's subtracted.
+//
+// The two frames hold different bodies, not the same bodies at different
+// angles. From the Sun there is no Sun to plot: it is the origin. The Moon has
+// no heliocentric longitude distinct from Earth's, being always within 0.0026 AU
+// of it. And Earth, which the geocentric frame necessarily omits, is not drawn
+// in this tradition either — the chart is read from the Sun looking out, and
+// Earth is where the reader stands, not a body in the field.
+export function planetLongitudes(iso, frame = 'heliocentric') {
   const T = (julianDayFromIso(iso) - 2451545) / 36525
   const earth = helioXYZ(PLANET_ELEMENTS[2], T)
   const prec = 1.39775 * T // equinox J2000 → of date
   const lon = v => (((Math.atan2(v[1], v[0]) * 180 / Math.PI) + prec) % 360 + 360) % 360
-  const out = [{ name: 'Sun', longitude: lon([-earth[0], -earth[1], -earth[2]]) }]
+  const geocentric = frame === 'geocentric'
+  const out = geocentric ? [{ name: 'Sun', longitude: lon([-earth[0], -earth[1], -earth[2]]) }] : []
   PLANET_ELEMENTS.forEach(el => {
     if (el[0] === 'Earth') return
     const p = helioXYZ(el, T)
-    out.push({ name: el[0], longitude: lon([p[0] - earth[0], p[1] - earth[1], p[2] - earth[2]]) })
+    out.push({
+      name: el[0],
+      longitude: geocentric
+        ? lon([p[0] - earth[0], p[1] - earth[1], p[2] - earth[2]])
+        : lon(p),
+    })
   })
   return out
 }
@@ -1690,14 +1705,14 @@ export function uniqueBodies(glyphs) {
 // substitute fixtures — a whole reading of illustrative numbers, announced only
 // by one sentence in the note. A cold service, a Horizons hiccup or a rate limit
 // is a reason to wait and ask again, not to abandon the sky.
-async function fetchBatch(endpoint, timestamp, batch, attempts = 3) {
+async function fetchBatch(endpoint, timestamp, batch, frame = 'heliocentric', attempts = 3) {
   let last
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     if (attempt) await new Promise(resolve => setTimeout(resolve, 400 * 2 ** (attempt - 1)))
     try {
       const res = await fetch(endpoint, {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ timestamp, bodies: batch }),
+        body: JSON.stringify({ timestamp, bodies: batch, frame }),
         signal: AbortSignal.timeout(30000),
       })
       const data = await res.json().catch(() => ({}))
@@ -1720,13 +1735,13 @@ async function fetchBatch(endpoint, timestamp, batch, attempts = 3) {
 // round trips, and on a cold service that is 10-20 seconds. Without it the
 // service path reports nothing at all while it works — the direct path had
 // progress, the one actually used did not.
-export async function fetchGlyphLongitudes(glyphs, timestamp, endpoint, onProgress = () => {}) {
+export async function fetchGlyphLongitudes(glyphs, timestamp, endpoint, onProgress = () => {}, frame = 'heliocentric') {
   const bodies = uniqueBodies(glyphs)
   const lonByName = new Map()
   const placements = []
   onProgress({ completed: 0, total: bodies.length })
   for (let i = 0; i < bodies.length; i += 8) {
-    const data = await fetchBatch(endpoint, timestamp, bodies.slice(i, i + 8))
+    const data = await fetchBatch(endpoint, timestamp, bodies.slice(i, i + 8), frame)
     data.placements.forEach(p => {
       if (!lonByName.has(p.name)) lonByName.set(p.name, p.longitude)
       placements.push({ command: p.command, name: p.name, longitude: p.longitude, latitude: p.latitude })
@@ -1744,12 +1759,15 @@ export async function fetchGlyphLongitudes(glyphs, timestamp, endpoint, onProgre
 // therefore needs the Codex ephemeris service, local or hosted, for real sky.
 // Query + parser ported verbatim from server/horizons.js
 export const HORIZONS_ENDPOINT = 'https://ssd.jpl.nasa.gov/api/horizons.api'
-export function horizonsUrl(command, timestamp) {
+// Sun body centre. The Codex is drawn from the Sun, not from the barycentre,
+// which sits about 0.013° away and is a different origin.
+export const CENTERS = { heliocentric: '500@10', geocentric: '500@399' }
+export function horizonsUrl(command, timestamp, frame = 'heliocentric') {
   if (!/^\d+;?$/.test(command)) throw new TypeError('Horizons command must be numeric.')
   const parameters = new URLSearchParams({
     format: 'json', COMMAND: `'${command}'`, OBJ_DATA: 'NO', MAKE_EPHEM: 'YES',
     // Repo `julianDate` takes a Date; this function is handed an ISO string.
-    EPHEM_TYPE: 'OBSERVER', CENTER: "'500@399'", TLIST: `'${julianDate(new Date(timestamp)).toFixed(8)}'`,
+    EPHEM_TYPE: 'OBSERVER', CENTER: `'${CENTERS[frame] || CENTERS.heliocentric}'`, TLIST: `'${julianDate(new Date(timestamp)).toFixed(8)}'`,
     TLIST_TYPE: 'JD', TIME_TYPE: 'UT', TIME_DIGITS: 'FRACSEC', QUANTITIES: "'31'", CSV_FORMAT: 'YES',
   })
   return `${HORIZONS_ENDPOINT}?${parameters}`
@@ -1774,18 +1792,18 @@ async function mapConcurrent(items, limit, operation) {
   return output
 }
 // Direct fetch of all unique glyph bodies, cached per body+instant in localStorage
-export async function fetchGlyphLongitudesDirect(glyphs, timestamp, onProgress = () => {}) {
+export async function fetchGlyphLongitudesDirect(glyphs, timestamp, onProgress = () => {}, frame = 'heliocentric') {
   const bodies = uniqueBodies(glyphs)
   const iso = new Date(timestamp).toISOString()
   const lonByName = new Map()
   const placements = []
   let done = 0
   await mapConcurrent(bodies, 3, async body => {
-    const key = 'glcx_eph_' + body.command + '|' + iso
+    const key = 'glcx_eph_' + body.command + '|' + iso + '|' + frame
     let placement
     try { placement = JSON.parse(localStorage.getItem(key)) } catch (e) { placement = null }
     if (!placement) {
-      const res = await fetch(horizonsUrl(body.command, iso), { signal: AbortSignal.timeout(30000) })
+      const res = await fetch(horizonsUrl(body.command, iso, frame), { signal: AbortSignal.timeout(30000) })
       if (!res.ok) throw new Error('Horizons HTTP ' + res.status)
       placement = parseHorizonsPlacement(await res.json())
       try { localStorage.setItem(key, JSON.stringify(placement)) } catch (e) { /* cache full — proceed uncached */ }
@@ -2019,21 +2037,44 @@ function chordEvidence(chords) {
  * @param source    Map of name→longitude (legacy) carrying `.placements`, or a placements array
  * @param natal     [{ name, longitude }] natal planets, Moon included
  * @param live      [{ name, longitude }] present-sky planets
- * @param options   { instant, birthplace } — birthplace unlocks the Four Angles
+ * @param options   { instant, birthplace, frame } — frame defaults to heliocentric
  */
 export function computeReading(glyphs, source, natal, live, options = {}) {
+  const frame = options.frame === 'geocentric' ? 'geocentric' : 'heliocentric'
   const placementList = placementsFrom(glyphs, source)
   const seated = placementsBySeat(placementList, glyphs)
   const lonByName = source instanceof Map ? source : longitudeView(seated)
 
-  const natalWithCommands = withCommands(natal)
+  // From the Sun there is no Sun to plot, and the Moon has no longitude of its
+  // own. Filtered here as well as at the caller, so a stale caller cannot slip a
+  // meaningless body into a heliocentric reading.
+  const bodies = frame === 'heliocentric'
+    ? natal.filter(body => body.name !== 'Sun' && body.name !== 'Moon')
+    : natal
+  const natalWithCommands = withCommands(bodies)
 
-  // i. Exact conjunctions — every seat against every natal planet, tightest first.
+  // Three seats name a presence rather than a catalogue body. Two of them —
+  // Venus and Uranus — are real planets that the catalogue join skips, because
+  // it only accepts numbered bodies, so those seats never received a position
+  // at all. Seat them from the measured planet. The third, Mirai, has no body in
+  // any frame and stays unplaced, which is what an invoked presence is.
+  glyphs.filter(glyph => !glyph.catalogueId).forEach(glyph => {
+    const body = natalWithCommands.find(candidate => candidate.name === glyph.name)
+    if (!body) return
+    seated.set(glyph.number, { command: body.command, seat: glyph.number, name: glyph.name, longitude: body.longitude })
+  })
+
+  // A seat that holds a planet cannot be conjunct that planet: seats 39 and 64
+  // ARE Venus and Uranus, so the pairing is the body against itself at 0.00°,
+  // which is a tautology rather than a finding.
+  const isSelf = (placement, planet) => placement.command && planet.command && placement.command === planet.command
+
+  // i. Exact conjunctions — every seat against every planet, tightest first.
   const conjunctions = []
   natalWithCommands.forEach(planet => {
     seated.forEach((placement, seat) => {
       const glyph = glyphs.find(candidate => candidate.number === seat)
-      if (!glyph) return
+      if (!glyph || isSelf(placement, planet)) return
       const contact = conjunction(placement.longitude, planet.longitude)
       if (contact) conjunctions.push({ glyph, placement, planet: planet.name, ...contact })
     })
@@ -2043,14 +2084,38 @@ export function computeReading(glyphs, source, natal, live, options = {}) {
     || first.orb - second.orb
     || first.glyph.number - second.glyph.number)
 
+  // A seam body holds two seats at one longitude, so it meets a planet twice at
+  // an identical orb and printed twice. One contact, with the seats it was made
+  // from carried alongside.
+  const seenContact = new Set()
+  const distinctConjunctions = conjunctions.filter(contact => {
+    const key = `${contact.glyph.name}|${contact.planet}`
+    if (seenContact.has(key)) return false
+    seenContact.add(key)
+    return true
+  })
+
   // ii. The Planetary Courts — one court per natal planet, canon implementation.
   const courts = populatedCourts(planetaryCourts(glyphs, seated, natalWithCommands, MAJOR_BODIES))
+    .map(court => ({
+      ...court,
+      // Same two exclusions: a planet does not attend its own court, and a seam
+      // body is one member of it rather than two.
+      contacts: court.contacts.filter((contact, index, all) =>
+        !(court.planet && contact.placement.command === court.planet.command)
+        && all.findIndex(other => other.glyph.name === contact.glyph.name) === index),
+    }))
+    .filter(court => court.contacts.length)
 
   // iii. The Densest Cluster — counted over unique catalogue bodies.
   const cluster = densestCluster(glyphs, seated)
 
   // iv. The Four Angles — only when a birthplace resolved. Never inferred.
-  const resolved = options.birthplace ? resolveBirthplace(options.birthplace) : null
+  // The angles belong to the Earth. Ascendant and Midheaven are where the
+  // ecliptic meets a horizon and a meridian at a place on a turning planet;
+  // from the Sun's centre there is no horizon to meet, so the layer does not
+  // exist in this frame rather than merely going quiet.
+  const resolved = frame === 'geocentric' && options.birthplace ? resolveBirthplace(options.birthplace) : null
   // A name answering to two places is a question, not a location. Carry the
   // candidates so the interface can ask, and leave the angles silent meanwhile —
   // picking one would put a wrong ascendant in the reading with nothing to show.
@@ -2176,15 +2241,17 @@ export function computeReading(glyphs, source, natal, live, options = {}) {
   return {
     // Shapes the shipped interface already binds to.
     points,
-    conjunctions: conjunctions.slice(0, 6),
+    conjunctions: distinctConjunctions.slice(0, 6),
     courts: courts.slice(0, 3).map(court => ({ planet: court.body.name, contacts: court.contacts })),
     chords: chords.slice(0, 5),
     activations: activations.slice(0, 3),
 
     // Layers iv-vii, now computed rather than described.
+    frame,
     angles,
     angleConfidence,
     angleGeometry,
+    anglesUnavailable: frame === 'heliocentric' ? 'The four angles are Earth\u2019s. Read from the Sun, there is no horizon for them to stand on.' : null,
     birthplace: place,
     ambiguousPlaces,
     gates: { occupancy, loudest, silent, walk, braid },

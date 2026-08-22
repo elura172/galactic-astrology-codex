@@ -12,10 +12,13 @@ const glyphs = engine.parseCodex(readFileSync(join(root, 'codex_of_celestial_gly
 const INSTANT = '1988-03-12T04:32:00Z'
 
 function pass(options = {}) {
+  const frame = options.frame === 'geocentric' ? 'geocentric' : 'heliocentric'
   const longitudes = engine.fixtureLongitudes(glyphs)
-  const natal = [...engine.planetLongitudes(INSTANT), { name: 'Moon', longitude: engine.moonLongitude(INSTANT) }]
-  const live = engine.planetLongitudes(INSTANT).filter(planet => ['Sun', 'Venus', 'Mars'].includes(planet.name))
-  return engine.computeReading(glyphs, longitudes, natal, live, { instant: INSTANT, ...options })
+  const natal = frame === 'geocentric'
+    ? [...engine.planetLongitudes(INSTANT, 'geocentric'), { name: 'Moon', longitude: engine.moonLongitude(INSTANT) }]
+    : engine.planetLongitudes(INSTANT)
+  const live = engine.planetLongitudes(INSTANT, frame).filter(planet => ['Venus', 'Mars'].includes(planet.name))
+  return engine.computeReading(glyphs, longitudes, natal, live, { instant: INSTANT, frame, ...options })
 }
 
 // The interface calls these by name. Losing one breaks the phone build at
@@ -86,19 +89,19 @@ test('silence in the gates is reported, never omitted', () => {
 })
 
 test('the four angles stay silent without a birthplace, and are flagged with one', () => {
-  assert.equal(pass().angles, null, 'no place means no angles — never inferred')
-  assert.equal(pass().angleConfidence, null)
+  assert.equal(pass({ frame: 'geocentric' }).angles, null, 'no place means no angles — never inferred')
+  assert.equal(pass({ frame: 'geocentric' }).angleConfidence, null)
 
-  const located = pass({ birthplace: 'Kyoto, Japan' })
+  const located = pass({ frame: 'geocentric', birthplace: 'Kyoto, Japan' })
   assert.ok(Array.isArray(located.angles), 'a known city yields angles')
   assert.equal(located.angles.length, 4)
   assert.deepEqual(located.angles.map(angle => angle.label), ['Ascendant', 'Midheaven', 'Descendant', 'Imum Coeli'])
   assert.equal(located.angleConfidence, 'exact', 'a city carries an IANA zone')
 
-  const coordinates = pass({ birthplace: '35.0116, 135.7681' })
+  const coordinates = pass({ frame: 'geocentric', birthplace: '35.0116, 135.7681' })
   assert.equal(coordinates.angleConfidence, 'approximate', 'bare coordinates cannot fix the instant to a zone')
 
-  assert.equal(pass({ birthplace: 'Rivendell' }).angles, null, 'an unresolved place stays silent')
+  assert.equal(pass({ frame: 'geocentric', birthplace: 'Rivendell' }).angles, null, 'an unresolved place stays silent')
 })
 
 test('chords keep the field names the lattice renderer joins on', () => {
@@ -117,7 +120,7 @@ test('chords keep the field names the lattice renderer joins on', () => {
 })
 
 test('the synthesis packet carries traceable evidence under the generation contract', () => {
-  const packet = pass({ birthplace: 'Kyoto, Japan' }).packet
+  const packet = pass({ frame: 'geocentric', birthplace: 'Kyoto, Japan' }).packet
   assert.ok(packet, 'a packet is produced')
   assert.equal(packet.schema, 'celestial-glyphs/synthesis-packet/v1')
   assert.equal(packet.generationContract.evidenceOnly, true)
@@ -145,7 +148,7 @@ test('seam seats do not duplicate the chords they form', () => {
   // A seam body occupies two seats at one longitude, so both seats form the
   // same geometric chord to any third point. The seats are real; the second row
   // is not \u2014 it renders as the same chord written backwards.
-  const reading = pass({ birthplace: 'Kyoto, Japan' })
+  const reading = pass({ frame: 'geocentric', birthplace: 'Kyoto, Japan' })
   const keys = reading.lattice.chords.map(chord => [chord.first, chord.second].sort().join(' ') + chord.name)
   assert.equal(new Set(keys).size, keys.length, 'the lattice lists each chord once')
 
@@ -157,7 +160,7 @@ test('seam seats do not duplicate the chords they form', () => {
 test('synthesis prose names a seam body once, not twice', () => {
   // Seat counts keep both seats (the measurement is about seats); the prose is
   // about bodies, and "Anubis, Anubis" reads as a fault rather than as a seam.
-  const reading = pass({ birthplace: 'Kyoto, Japan' })
+  const reading = pass({ frame: 'geocentric', birthplace: 'Kyoto, Japan' })
   for (const passage of reading.synthesis.passages) {
     const listed = passage.match(/court of \\d+: ([^.]+)\\./)
     if (!listed) continue
@@ -299,13 +302,13 @@ test('a birthplace resolves across spelling, accents and country order', () => {
 })
 
 test('an ambiguous birthplace leaves the angles silent and says why', () => {
-  const reading = pass({ birthplace: 'Portland' })
+  const reading = pass({ frame: 'geocentric', birthplace: 'Portland' })
   assert.equal(reading.angles, null, 'no angles are computed from a question')
   assert.equal(reading.birthplace, null)
   assert.ok(Array.isArray(reading.ambiguousPlaces), 'the candidates are carried for the interface to ask with')
   assert.equal(reading.ambiguousPlaces.length, 2)
 
-  const settled = pass({ birthplace: 'Portland, Oregon' })
+  const settled = pass({ frame: 'geocentric', birthplace: 'Portland, Oregon' })
   assert.ok(settled.angles, 'naming the state settles it')
   assert.equal(settled.angleConfidence, 'exact')
 })
@@ -319,5 +322,93 @@ test('every place in the table is well formed', () => {
     assert.ok(place && !place.ambiguous, `a full label must resolve on its own: ${label}`)
     assert.ok(Math.abs(place.latitude) <= 90 && Math.abs(place.longitude) <= 180, `coordinates out of range: ${label}`)
     assert.doesNotThrow(() => new Intl.DateTimeFormat('en', { timeZone: place.timeZone }), `invalid zone: ${label}`)
+  }
+})
+
+test('the reading is drawn from the Sun by default', () => {
+  const reading = pass()
+  assert.equal(reading.frame, 'heliocentric')
+  assert.equal(reading.angles, null, 'the angles do not exist in this frame')
+  assert.ok(reading.anglesUnavailable, 'and the reading says why rather than going quiet')
+  // Naming a birthplace must not conjure them back: there is no horizon at the Sun.
+  assert.equal(pass({ birthplace: 'Kyoto, Japan' }).angles, null)
+})
+
+test('the two frames hold different bodies, not the same bodies at other angles', () => {
+  const helio = engine.planetLongitudes(INSTANT)
+  const geo = engine.planetLongitudes(INSTANT, 'geocentric')
+
+  assert.ok(!helio.some(p => p.name === 'Sun'), 'from the Sun there is no Sun to plot')
+  assert.ok(geo.some(p => p.name === 'Sun'), 'seen from Earth the Sun is a body')
+  assert.ok(!helio.some(p => p.name === 'Earth'), 'Earth is where the reader stands, not a body in the field')
+  assert.equal(helio.length, geo.length - 1)
+
+  // An inner planet swings hugely between frames; a distant one barely moves,
+  // because the Earth-Sun baseline is negligible at that range. If Mercury came
+  // back unchanged the centre never took effect.
+  const at = (list, name) => list.find(p => p.name === name).longitude
+  const swing = (name) => Math.abs(((at(helio, name) - at(geo, name)) % 360 + 540) % 360 - 180)
+  assert.ok(swing('Mercury') > 30, `Mercury should move sharply between frames, moved ${swing('Mercury')}`)
+  assert.ok(swing('Pluto') < 5, `Pluto should barely move between frames, moved ${swing('Pluto')}`)
+})
+
+test('the reading changes when the centre does', () => {
+  // Fixture glyph longitudes are synthetic and identical in both frames, so the
+  // glyph-to-glyph lattice cannot differ here — only what touches a planet can.
+  // Real placements are checked against the live service, not in a unit test.
+  const helio = pass()
+  const geo = pass({ frame: 'geocentric' })
+
+  const contacts = reading => reading.conjunctions.map(c => `${c.glyph.number}~${c.planet}~${c.orb.toFixed(4)}`).join('|')
+  assert.notEqual(contacts(helio), contacts(geo), 'moving the centre must move the contacts')
+
+  const courts = reading => reading.courts.map(c => c.planet).join()
+  assert.notEqual(courts(helio), courts(geo))
+
+  for (const contact of helio.conjunctions) {
+    assert.ok(contact.planet !== 'Sun' && contact.planet !== 'Moon', `${contact.planet} has no place in a Sun-centred chart`)
+  }
+  assert.ok(geo.conjunctions.some(c => c.planet === 'Sun' || c.planet === 'Moon')
+    || geo.courts.some(c => c.planet === 'Sun' || c.planet === 'Moon'),
+    'the Earth frame still knows the Sun and Moon')
+})
+
+test('the two seats naming planets are finally placed, and the presence is not', () => {
+  // Seats 39 and 64 name Venus and Uranus. The catalogue join only accepts
+  // numbered bodies, so both sat unplaced while the planets were measured
+  // elsewhere in the same reading — the seat and the body were unrelated.
+  const reading = pass()
+  const seats = new Set(reading.points.filter(p => p.seat).map(p => p.seat))
+  assert.ok(seats.has(39), 'Venus takes her seat')
+  assert.ok(seats.has(64), 'Uranus takes his')
+  assert.ok(!seats.has(108), 'Mirai is an invoked presence and has no body in any frame')
+
+  const venus = reading.points.find(p => p.seat === 39)
+  const measured = engine.planetLongitudes(INSTANT).find(p => p.name === 'Venus')
+  assert.equal(venus.longitude, measured.longitude, 'the seat carries the measured planet, not a second opinion')
+})
+
+test('a planet is not conjunct itself, and does not attend its own court', () => {
+  // Seating Venus and Uranus made seats 39 and 64 hold the very bodies they
+  // name, which then paired with themselves at 0.00° — a tautology reported as
+  // the tightest contact in the chart, twice displacing a real finding.
+  const reading = pass()
+  for (const contact of reading.conjunctions) {
+    assert.notEqual(contact.glyph.name, contact.planet, `${contact.glyph.name} cannot be conjunct itself`)
+    assert.ok(contact.orb > 0, 'a zero orb here means a body met its own seat')
+  }
+  for (const court of reading.courts) {
+    assert.ok(!court.contacts.some(c => c.glyph.name === court.planet), `${court.planet} attends its own court`)
+    assert.ok(court.contacts.length, 'an emptied court is dropped rather than shown bare')
+  }
+})
+
+test('a seam body meets a planet once, not twice', () => {
+  const reading = pass()
+  const seen = reading.conjunctions.map(c => `${c.glyph.name}|${c.planet}`)
+  assert.equal(new Set(seen).size, seen.length, 'the same body and planet are reported once')
+  for (const court of reading.courts) {
+    const names = court.contacts.map(c => c.glyph.name)
+    assert.equal(new Set(names).size, names.length, `${court.planet}'s court lists a body twice`)
   }
 })

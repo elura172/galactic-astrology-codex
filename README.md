@@ -58,6 +58,37 @@ npm run sky            # the ephemeris service locally, on :8787
 `dist-phone/CANVAS-PATCH.md` records the component edits the canvas needs, and
 `DESIGN_SYSTEM.md` the visual direction.
 
+## The frame
+
+The Codex is read **from the Sun**. Bodies are fetched heliocentrically
+(`CENTER '500@10'`, the Sun's body centre rather than the barycentre), and the
+frame is part of every cache key — a placement's centre is part of its identity,
+and without that a geocentric longitude answers a heliocentric request with
+nothing to show for it.
+
+Two frames do not hold the same bodies at different angles; they hold different
+bodies. From the Sun there is no Sun to plot, the Moon has no longitude distinct
+from Earth's, and Earth is where the reader stands rather than a body in the
+field. So the chart carries eight planets, Mercury through Pluto, plus the 96
+catalogue bodies of the canon.
+
+**The four angles do not exist here.** Ascendant and Midheaven are where the
+ecliptic meets a horizon and a meridian at a place on a turning planet; from the
+Sun's centre there is no horizon for them to stand on. The layer is absent
+rather than silent, and birth *place* is not asked for. Birth time matters much
+less than it does in an Earth-centred chart — heliocentric longitudes move
+slowly enough that an unknown hour is a small uncertainty rather than a ruinous
+one.
+
+The geocentric frame remains implemented and tested (`frame: 'geocentric'`),
+along with the angles, the house wheel and the 260-place birthplace resolver.
+None of it is reachable from the app; it is dormant, not deleted.
+
+The ten gates are the decagon: the dodecahedron seen down its Zenith–Nadir axis,
+its ten band faces projecting to a ring anchored at the Galactic Centre, 36°
+apart. The five chords — 36°, 72°, 108°, 144°, 180° — are the complete set of
+distances between that decagon's vertices, edge through diameter.
+
 ## The ephemeris
 
 Readings need measured positions, and a browser cannot fetch them itself: JPL

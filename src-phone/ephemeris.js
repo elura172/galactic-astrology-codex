@@ -37,14 +37,14 @@ export function uniqueBodies(glyphs) {
 // substitute fixtures — a whole reading of illustrative numbers, announced only
 // by one sentence in the note. A cold service, a Horizons hiccup or a rate limit
 // is a reason to wait and ask again, not to abandon the sky.
-async function fetchBatch(endpoint, timestamp, batch, attempts = 3) {
+async function fetchBatch(endpoint, timestamp, batch, frame = 'heliocentric', attempts = 3) {
   let last
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     if (attempt) await new Promise(resolve => setTimeout(resolve, 400 * 2 ** (attempt - 1)))
     try {
       const res = await fetch(endpoint, {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ timestamp, bodies: batch }),
+        body: JSON.stringify({ timestamp, bodies: batch, frame }),
         signal: AbortSignal.timeout(30000),
       })
       const data = await res.json().catch(() => ({}))
@@ -67,13 +67,13 @@ async function fetchBatch(endpoint, timestamp, batch, attempts = 3) {
 // round trips, and on a cold service that is 10-20 seconds. Without it the
 // service path reports nothing at all while it works — the direct path had
 // progress, the one actually used did not.
-export async function fetchGlyphLongitudes(glyphs, timestamp, endpoint, onProgress = () => {}) {
+export async function fetchGlyphLongitudes(glyphs, timestamp, endpoint, onProgress = () => {}, frame = 'heliocentric') {
   const bodies = uniqueBodies(glyphs)
   const lonByName = new Map()
   const placements = []
   onProgress({ completed: 0, total: bodies.length })
   for (let i = 0; i < bodies.length; i += 8) {
-    const data = await fetchBatch(endpoint, timestamp, bodies.slice(i, i + 8))
+    const data = await fetchBatch(endpoint, timestamp, bodies.slice(i, i + 8), frame)
     data.placements.forEach(p => {
       if (!lonByName.has(p.name)) lonByName.set(p.name, p.longitude)
       placements.push({ command: p.command, name: p.name, longitude: p.longitude, latitude: p.latitude })
@@ -91,12 +91,15 @@ export async function fetchGlyphLongitudes(glyphs, timestamp, endpoint, onProgre
 // therefore needs the Codex ephemeris service, local or hosted, for real sky.
 // Query + parser ported verbatim from server/horizons.js
 export const HORIZONS_ENDPOINT = 'https://ssd.jpl.nasa.gov/api/horizons.api'
-export function horizonsUrl(command, timestamp) {
+// Sun body centre. The Codex is drawn from the Sun, not from the barycentre,
+// which sits about 0.013° away and is a different origin.
+export const CENTERS = { heliocentric: '500@10', geocentric: '500@399' }
+export function horizonsUrl(command, timestamp, frame = 'heliocentric') {
   if (!/^\d+;?$/.test(command)) throw new TypeError('Horizons command must be numeric.')
   const parameters = new URLSearchParams({
     format: 'json', COMMAND: `'${command}'`, OBJ_DATA: 'NO', MAKE_EPHEM: 'YES',
     // Repo `julianDate` takes a Date; this function is handed an ISO string.
-    EPHEM_TYPE: 'OBSERVER', CENTER: "'500@399'", TLIST: `'${julianDate(new Date(timestamp)).toFixed(8)}'`,
+    EPHEM_TYPE: 'OBSERVER', CENTER: `'${CENTERS[frame] || CENTERS.heliocentric}'`, TLIST: `'${julianDate(new Date(timestamp)).toFixed(8)}'`,
     TLIST_TYPE: 'JD', TIME_TYPE: 'UT', TIME_DIGITS: 'FRACSEC', QUANTITIES: "'31'", CSV_FORMAT: 'YES',
   })
   return `${HORIZONS_ENDPOINT}?${parameters}`
@@ -121,18 +124,18 @@ async function mapConcurrent(items, limit, operation) {
   return output
 }
 // Direct fetch of all unique glyph bodies, cached per body+instant in localStorage
-export async function fetchGlyphLongitudesDirect(glyphs, timestamp, onProgress = () => {}) {
+export async function fetchGlyphLongitudesDirect(glyphs, timestamp, onProgress = () => {}, frame = 'heliocentric') {
   const bodies = uniqueBodies(glyphs)
   const iso = new Date(timestamp).toISOString()
   const lonByName = new Map()
   const placements = []
   let done = 0
   await mapConcurrent(bodies, 3, async body => {
-    const key = 'glcx_eph_' + body.command + '|' + iso
+    const key = 'glcx_eph_' + body.command + '|' + iso + '|' + frame
     let placement
     try { placement = JSON.parse(localStorage.getItem(key)) } catch (e) { placement = null }
     if (!placement) {
-      const res = await fetch(horizonsUrl(body.command, iso), { signal: AbortSignal.timeout(30000) })
+      const res = await fetch(horizonsUrl(body.command, iso, frame), { signal: AbortSignal.timeout(30000) })
       if (!res.ok) throw new Error('Horizons HTTP ' + res.status)
       placement = parseHorizonsPlacement(await res.json())
       try { localStorage.setItem(key, JSON.stringify(placement)) } catch (e) { /* cache full — proceed uncached */ }

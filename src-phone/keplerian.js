@@ -33,17 +33,32 @@ function helioXYZ(el, T) {
     (sw * sI) * xp + (cw * sI) * yp,
   ]
 }
-// Sun + nine planets, geocentric apparent-ish ecliptic longitude of date (Keplerian; ~arcminute accuracy, no Moon)
-export function planetLongitudes(iso) {
+// Heliocentric by default: `helioXYZ` already returns Sun-centred vectors, so a
+// heliocentric longitude is simply that vector's angle — the geocentric one was
+// the same vector with Earth's subtracted.
+//
+// The two frames hold different bodies, not the same bodies at different
+// angles. From the Sun there is no Sun to plot: it is the origin. The Moon has
+// no heliocentric longitude distinct from Earth's, being always within 0.0026 AU
+// of it. And Earth, which the geocentric frame necessarily omits, is not drawn
+// in this tradition either — the chart is read from the Sun looking out, and
+// Earth is where the reader stands, not a body in the field.
+export function planetLongitudes(iso, frame = 'heliocentric') {
   const T = (julianDayFromIso(iso) - 2451545) / 36525
   const earth = helioXYZ(PLANET_ELEMENTS[2], T)
   const prec = 1.39775 * T // equinox J2000 → of date
   const lon = v => (((Math.atan2(v[1], v[0]) * 180 / Math.PI) + prec) % 360 + 360) % 360
-  const out = [{ name: 'Sun', longitude: lon([-earth[0], -earth[1], -earth[2]]) }]
+  const geocentric = frame === 'geocentric'
+  const out = geocentric ? [{ name: 'Sun', longitude: lon([-earth[0], -earth[1], -earth[2]]) }] : []
   PLANET_ELEMENTS.forEach(el => {
     if (el[0] === 'Earth') return
     const p = helioXYZ(el, T)
-    out.push({ name: el[0], longitude: lon([p[0] - earth[0], p[1] - earth[1], p[2] - earth[2]]) })
+    out.push({
+      name: el[0],
+      longitude: geocentric
+        ? lon([p[0] - earth[0], p[1] - earth[1], p[2] - earth[2]])
+        : lon(p),
+    })
   })
   return out
 }
