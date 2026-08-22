@@ -262,3 +262,62 @@ test('the service path reports progress while it works', async () => {
     globalThis.fetch = realFetch
   }
 })
+
+test('a city name shared by two countries is a question, not a guess', () => {
+  // "Portland, Maine" used to resolve to Oregon: the table keyed on the bare
+  // city name and took the first match, so the reading carried an ascendant
+  // computed 4,000 km and three hours from the actual birth, with nothing said.
+  const bare = engine.resolveBirthplace('Portland')
+  assert.ok(bare.ambiguous, 'a shared name resolves to nothing on its own')
+  assert.equal(bare.ambiguous.length, 2)
+  assert.ok(bare.ambiguous.every(place => place.country && place.label.includes(place.country)))
+
+  const maine = engine.resolveBirthplace('Portland, Maine')
+  assert.equal(maine.admin, 'Maine')
+  assert.equal(maine.timeZone, 'America/New_York')
+
+  const oregon = engine.resolveBirthplace('Portland, Oregon')
+  assert.equal(oregon.timeZone, 'America/Los_Angeles')
+  assert.notEqual(maine.longitude, oregon.longitude)
+
+  for (const name of ['Athens', 'Tripoli', 'Santiago', 'Cambridge']) {
+    assert.ok(engine.resolveBirthplace(name).ambiguous, `${name} names more than one place`)
+  }
+})
+
+test('a birthplace resolves across spelling, accents and country order', () => {
+  assert.equal(engine.resolveBirthplace('Bogotá').label, 'Bogota, Colombia')
+  assert.equal(engine.resolveBirthplace('bogota, colombia').label, 'Bogota, Colombia')
+  assert.equal(engine.resolveBirthplace('  KYOTO  ').label, 'Kyoto, Japan')
+  assert.equal(engine.resolveBirthplace('Athens, Georgia, United States').country, 'United States')
+  assert.equal(engine.resolveBirthplace('Rivendell'), null)
+
+  const coords = engine.resolveBirthplace('35.01, 135.77')
+  assert.equal(coords.source, 'coordinates')
+  assert.equal(coords.timeZone, null, 'coordinates carry no zone, so angles stay approximate')
+  assert.equal(engine.resolveBirthplace('91, 0'), null, 'an impossible latitude is not a place')
+})
+
+test('an ambiguous birthplace leaves the angles silent and says why', () => {
+  const reading = pass({ birthplace: 'Portland' })
+  assert.equal(reading.angles, null, 'no angles are computed from a question')
+  assert.equal(reading.birthplace, null)
+  assert.ok(Array.isArray(reading.ambiguousPlaces), 'the candidates are carried for the interface to ask with')
+  assert.equal(reading.ambiguousPlaces.length, 2)
+
+  const settled = pass({ birthplace: 'Portland, Oregon' })
+  assert.ok(settled.angles, 'naming the state settles it')
+  assert.equal(settled.angleConfidence, 'exact')
+})
+
+test('every place in the table is well formed', () => {
+  const labels = engine.placeLabels()
+  assert.equal(labels.length, engine.knownPlaceCount())
+  assert.equal(new Set(labels).size, labels.length, 'no two places share a label')
+  for (const label of labels) {
+    const place = engine.resolveBirthplace(label)
+    assert.ok(place && !place.ambiguous, `a full label must resolve on its own: ${label}`)
+    assert.ok(Math.abs(place.latitude) <= 90 && Math.abs(place.longitude) <= 180, `coordinates out of range: ${label}`)
+    assert.doesNotThrow(() => new Intl.DateTimeFormat('en', { timeZone: place.timeZone }), `invalid zone: ${label}`)
+  }
+})

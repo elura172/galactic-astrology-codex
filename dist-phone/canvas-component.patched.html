@@ -869,17 +869,27 @@ a:hover { color:#0A0E15; }
       <div style="margin-top:64px; display:flex; flex-direction:column; gap:32px;">
         <div style="display:flex; flex-direction:column; gap:6px;">
           <div style="font-family:'Cormorant Garamond',serif; font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:#7A7466;">Birth date</div>
-          <input value="{{ birthDate }}" sc-camel-on-change="{{ setBirthDate }}" placeholder="12 March 1988" style="background:transparent; border:0; border-bottom:1px solid rgba(10,14,21,0.22); font-family:'Spectral',serif; font-size:16px; color:#0A0E15; padding:10px 0; outline:none;">
+          <input type="date" min="1900-01-01" value="{{ birthDate }}" sc-camel-on-change="{{ setBirthDate }}" style="background:transparent; border:0; border-bottom:1px solid rgba(10,14,21,0.22); font-family:'Spectral',serif; font-size:16px; color:#0A0E15; padding:10px 0; outline:none;">
         </div>
         <div style="display:flex; flex-direction:column; gap:6px;">
           <div style="font-family:'Cormorant Garamond',serif; font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:#7A7466;">Local birth time</div>
-          <input value="{{ birthTime }}" sc-camel-on-change="{{ setBirthTime }}" placeholder="04:32 — or leave empty if unknown" style="background:transparent; border:0; border-bottom:1px solid rgba(10,14,21,0.22); font-family:'Spectral',serif; font-size:16px; color:#0A0E15; padding:10px 0; outline:none;">
+          <input type="time" value="{{ birthTime }}" sc-camel-on-change="{{ setBirthTime }}" style="background:transparent; border:0; border-bottom:1px solid rgba(10,14,21,0.22); font-family:'Spectral',serif; font-size:16px; color:#0A0E15; padding:10px 0; outline:none;">
+          <p style="margin:6px 0 0; font-size:11px; line-height:1.5; font-style:italic; color:#7A7466;">Leave empty if unknown — noon is then assumed, and the angles should not be trusted.</p>
         </div>
         <div style="display:flex; flex-direction:column; gap:6px;">
           <div style="font-family:'Cormorant Garamond',serif; font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:#7A7466;">Birthplace</div>
-          <input value="{{ birthPlace }}" sc-camel-on-change="{{ setBirthPlace }}" placeholder="City — or 51.5, -0.12" style="background:transparent; border:0; border-bottom:1px solid rgba(10,14,21,0.22); font-family:'Spectral',serif; font-size:16px; color:#0A0E15; padding:10px 0; outline:none;">
+          <input list="glcx-places" value="{{ birthPlace }}" sc-camel-on-change="{{ setBirthPlace }}" placeholder="City, Country — or 51.5, -0.12" style="background:transparent; border:0; border-bottom:1px solid rgba(10,14,21,0.22); font-family:'Spectral',serif; font-size:16px; color:#0A0E15; padding:10px 0; outline:none;">
+          <datalist id="glcx-places">
+            <sc-for list="{{ placeOptions }}" as="po" hint-placeholder-count="0">
+              <option value="{{ po.label }}"></option>
+            </sc-for>
+          </datalist>
+          <p style="margin:6px 0 0; font-size:11px; line-height:1.5; font-style:italic; color:#7A7466;">{{ placeNote }}</p>
         </div>
         <div sc-camel-on-click="{{ beginReading }}" style="margin-top:16px; align-self:flex-start; display:inline-flex; align-items:center; font-family:'Cormorant Garamond',serif; font-size:12px; letter-spacing:0.18em; text-transform:uppercase; font-weight:500; border:1px solid #B98438; color:#B98438; border-radius:1px; padding:14px 28px; cursor:pointer; min-height:44px;" style-hover="background:#B98438; color:#F1E8D6;">{{ beginLabel }}</div>
+        <sc-if value="{{ formNotice }}">
+          <p style="margin:0; font-size:12px; line-height:1.7; color:#B98438; max-width:44ch;">{{ formNotice }}</p>
+        </sc-if>
         <p style="margin:0; font-size:12px; line-height:1.7; font-style:italic; color:#7A7466; max-width:44ch;">Your birth data remains transient — nothing is stored, sent, or logged. Export is explicit and local.</p>
       </div>
       </sc-if>
@@ -1044,7 +1054,7 @@ a:hover { color:#0A0E15; }
 </x-dc>
 <script type="text/x-dc" data-dc-script="" data-props="{&quot;$preview&quot;: {&quot;width&quot;: 520, &quot;height&quot;: 980}, &quot;ephemerisEndpoint&quot;: {&quot;editor&quot;: &quot;text&quot;, &quot;default&quot;: &quot;/api/ephemeris&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Reading&quot;}}">
 class Component extends DCLogic {
-  state = { tab: 'wheel', ringIndex: null, seat: null, lineage: null, begun: false, glyphs: [], lineages: [], birthPlace: '', threshold: !localStorage.getItem('glcx_threshold_crossed') };
+  state = { tab: 'wheel', ringIndex: null, seat: null, lineage: null, begun: false, glyphs: [], lineages: [], birthPlace: '', formNotice: '', threshold: !localStorage.getItem('glcx_threshold_crossed') };
 
   async componentDidMount() {
     const mod = await import(window.__resources ? window.__resources.codexData : './codex-data.js');
@@ -1057,17 +1067,30 @@ class Component extends DCLogic {
   }
 
   parseInstant() {
-    const raw = (this.state.birthDate || '').trim() + ' ' + ((this.state.birthTime || '').trim().match(/^\d{1,2}:\d{2}$/) ? this.state.birthTime.trim() : '12:00');
-    const ms = Date.parse(raw + ' UTC') || Date.parse(raw);
+    // A native date input yields YYYY-MM-DD, which has exactly one reading.
+    // Free text did not: "12/3/1988" and "12.03.1988" both parsed to December
+    // the 3rd, and "twelfth of march 1988" to the 1st — each of them silently,
+    // returning a confident reading of a sky that was never anyone's.
+    const date = (this.state.birthDate || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+    const time = (this.state.birthTime || '').trim();
+    const clock = /^\d{1,2}:\d{2}$/.test(time) ? (time.length === 4 ? '0' + time : time) : '12:00';
+    const ms = Date.parse(date + 'T' + clock + ':00Z');
     return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
   }
 
   async computeReadingPass() {
     if (this.state.ephProgress) return;
-    this.setState({ ephProgress: 'Reading the sky \u2026' });
+    const instant = this.parseInstant();
+    if (!instant) {
+      // The old path substituted a hardcoded instant and noted it in passing.
+      // A chart of the wrong moment is not a lesser reading, it is a different
+      // person's, so nothing is computed until a date is given.
+      this.setState({ formNotice: 'A birth date is needed before the sky can be read. Nothing has been assumed in its place.' });
+      return;
+    }
+    this.setState({ ephProgress: 'Reading the sky \u2026', formNotice: '' });
     const glyphs = this.state.glyphs;
-    const instant = this.parseInstant() || '1988-03-12T04:32:00Z';
-    const usedDefault = !this.parseInstant();
     const natal = [...this.mod.planetLongitudes(instant), { name: 'Moon', longitude: this.mod.moonLongitude(instant) }];
     const now = new Date().toISOString();
     const live = [...this.mod.planetLongitudes(now).filter(p => ['Sun', 'Venus', 'Mars'].includes(p.name)), { name: 'Moon', longitude: this.mod.moonLongitude(now) }];
@@ -1094,7 +1117,7 @@ class Component extends DCLogic {
     // and the reading absent, which reads as the press having done nothing.
     try {
       const reading = this.mod.computeReading(glyphs, lonByName, natal, live, { instant, birthplace: this.state.birthPlace });
-      const note = 'Instant: ' + instant.replace('T', ' ').replace(':00.000Z', ' UT') + (usedDefault ? ' (default \u2014 date not parsed)' : '')
+      const note = 'Instant: ' + instant.replace('T', ' ').replace(':00.000Z', ' UT')
         + '. Planets: computed, Keplerian, \u00B1arcminutes. Glyph bodies: ' + glyphSource
         + '. Today\u2019s sky: computed for now, Moon included (\u00B10.1\u00B0)'
         + (reading.angles ? '. Angles: ' + reading.angleConfidence + ' for ' + reading.birthplace.label + '.' : '. Angles: silent \u2014 no birthplace resolved.');
@@ -1257,7 +1280,21 @@ class Component extends DCLogic {
       setBirthDate: (e) => this.setState({ birthDate: e.target.value }),
       setBirthTime: (e) => this.setState({ birthTime: e.target.value }),
       birthPlace: this.state.birthPlace || '',
-      setBirthPlace: (e) => this.setState({ birthPlace: e.target.value }),
+      setBirthPlace: (e) => this.setState({ birthPlace: e.target.value, formNotice: '' }),
+      placeOptions: this.mod ? this.mod.placeLabels().map(label => ({ label })) : [],
+      formNotice: this.state.formNotice || '',
+      // Say what the birthplace resolved to while it is still editable, rather
+      // than letting a silent non-match surface later as absent angles.
+      placeNote: (() => {
+        if (!this.mod) return '';
+        const typed = (this.state.birthPlace || '').trim();
+        if (!typed) return 'Optional \u2014 without it the four angles stay silent.';
+        const found = this.mod.resolveBirthplace(typed);
+        if (!found) return 'Not recognised. Try “City, Country”, or enter coordinates as “35.01, 135.77”.';
+        if (found.ambiguous) return 'Ambiguous \u2014 ' + found.ambiguous.map(p => p.label).join('  ·  ') + '. Name the country.';
+        if (found.source === 'coordinates') return 'Coordinates accepted. Without a timezone the angles are marked approximate.';
+        return found.label + ' \u2014 ' + found.timeZone.replace(/_/g, ' ') + '.';
+      })(),
       readingLayers: [
         { n: 'i', name: 'The Exact Conjunctions', desc: 'Glyphs conjunct natal planets or angles at the tightest measured orbs.' },
         { n: 'ii', name: 'The Planetary Courts', desc: 'One court per natal planet holding glyphs within orb \u2014 read as a relationship among offices.' },

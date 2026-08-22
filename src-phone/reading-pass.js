@@ -189,7 +189,12 @@ export function computeReading(glyphs, source, natal, live, options = {}) {
   const cluster = densestCluster(glyphs, seated)
 
   // iv. The Four Angles — only when a birthplace resolved. Never inferred.
-  const place = options.birthplace ? resolveBirthplace(options.birthplace) : null
+  const resolved = options.birthplace ? resolveBirthplace(options.birthplace) : null
+  // A name answering to two places is a question, not a location. Carry the
+  // candidates so the interface can ask, and leave the angles silent meanwhile —
+  // picking one would put a wrong ascendant in the reading with nothing to show.
+  const ambiguousPlaces = resolved && resolved.ambiguous ? resolved.ambiguous : null
+  const place = ambiguousPlaces ? null : resolved
   let angles = null
   let angleGeometry = null
   let angleConfidence = null
@@ -320,6 +325,7 @@ export function computeReading(glyphs, source, natal, live, options = {}) {
     angleConfidence,
     angleGeometry,
     birthplace: place,
+    ambiguousPlaces,
     gates: { occupancy, loudest, silent, walk, braid },
     cluster,
     lattice: { chords, families: [...families.entries()].map(([family, contacts]) => ({ family, contacts })) },
