@@ -165,3 +165,22 @@ test('synthesis prose names a seam body once, not twice', () => {
     assert.equal(new Set(names).size, names.length, `a name repeats in: ${passage}`)
   }
 })
+
+test('functions handed an ISO timestamp survive the canonical julianDate signature', () => {
+  // The canon's julianDate takes a Date; several phone functions hold an ISO
+  // string. The export-surface guard cannot see this — the export still exists,
+  // only its signature moved — and the failure is silent: horizonsUrl threw,
+  // the direct-Horizons fetch was caught, and the app fell through to fixtures
+  // while reporting a sandbox problem it did not have.
+  const instant = '1988-03-12T04:32:00Z'
+
+  const url = engine.horizonsUrl('1;', instant)
+  const julian = Number(decodeURIComponent(url.match(/TLIST=([^&]+)/)[1]).replace(/'/g, ''))
+  assert.ok(Number.isFinite(julian), 'TLIST must carry a finite Julian date')
+  assert.equal(julian.toFixed(5), engine.julianDate(new Date(instant)).toFixed(5))
+  assert.ok(julian > 2447000 && julian < 2447500, `Julian date ${julian} is not near 1988`)
+
+  // The same trap, in the two Keplerian entry points.
+  assert.ok(engine.planetLongitudes(instant).every(p => Number.isFinite(p.longitude)))
+  assert.ok(Number.isFinite(engine.moonLongitude(instant)))
+})

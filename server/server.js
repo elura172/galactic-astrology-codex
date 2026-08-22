@@ -4,11 +4,28 @@ import { join } from 'node:path'
 import { cacheKey, horizonsUrl, mapConcurrent, parseHorizonsPlacement } from './horizons.js'
 
 const port = Number(process.env.SKY_PORT || 8787)
+// Loopback by default. Set SKY_HOST=0.0.0.0 to reach the service from a phone
+// on the same network — only do that on a network you trust.
+const host = process.env.SKY_HOST || '127.0.0.1'
+// The service answers with public NASA/JPL data, holds no credentials and sets
+// no cookies, so it is shared with any origin unless one is named. Set
+// SKY_ORIGIN to a single origin to narrow it.
+const allowOrigin = process.env.SKY_ORIGIN || '*'
+
+// Browsers refuse a cross-origin read without these, and the client sends
+// `content-type: application/json`, which forces a preflight. Without both the
+// app silently falls through to its fixtures.
+const CORS = {
+  'access-control-allow-origin': allowOrigin,
+  'access-control-allow-methods': 'POST, GET, OPTIONS',
+  'access-control-allow-headers': 'content-type',
+  'access-control-max-age': '86400',
+}
 const cacheDirectory = new URL('../.cache/ephemeris/', import.meta.url)
 await mkdir(cacheDirectory, { recursive: true })
 
 function json(response, status, body) {
-  response.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+  response.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...CORS })
   response.end(JSON.stringify(body))
 }
 
@@ -52,6 +69,10 @@ async function placement(body, timestamp) {
 }
 
 createServer(async (request, response) => {
+  if (request.method === 'OPTIONS') {
+    response.writeHead(204, CORS)
+    return response.end()
+  }
   if (request.method === 'GET' && request.url === '/health') return json(response, 200, { ok: true, service: 'codex-ephemeris' })
   if (request.method !== 'POST' || request.url !== '/api/ephemeris') return json(response, 404, { error: 'Not found.' })
   try {
@@ -61,4 +82,4 @@ createServer(async (request, response) => {
   } catch (error) {
     return json(response, 400, { error: error.message })
   }
-}).listen(port, '127.0.0.1', () => console.log(`Codex ephemeris service listening on http://127.0.0.1:${port}`))
+}).listen(port, host, () => console.log(`Codex ephemeris service listening on http://${host}:${port} (origin: ${allowOrigin})`))

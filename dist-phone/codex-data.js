@@ -1486,14 +1486,20 @@ export async function fetchGlyphLongitudes(glyphs, timestamp, endpoint) {
   return withPlacements(lonByName, placements)
 }
 
-// --- Direct NASA/JPL Horizons access (browser; CORS-enabled endpoint) ---
+// --- Direct NASA/JPL Horizons access ---
+// NOT reachable from a browser: Horizons returns no Access-Control-Allow-Origin
+// and answers OPTIONS with 405, so a cross-origin fetch always fails. Kept
+// because it works wherever CORS does not apply (Node, a native shell); in the
+// browser this tier always falls through to the fixtures below. The phone app
+// therefore needs the Codex ephemeris service, local or hosted, for real sky.
 // Query + parser ported verbatim from server/horizons.js
 export const HORIZONS_ENDPOINT = 'https://ssd.jpl.nasa.gov/api/horizons.api'
 export function horizonsUrl(command, timestamp) {
   if (!/^\d+;?$/.test(command)) throw new TypeError('Horizons command must be numeric.')
   const parameters = new URLSearchParams({
     format: 'json', COMMAND: `'${command}'`, OBJ_DATA: 'NO', MAKE_EPHEM: 'YES',
-    EPHEM_TYPE: 'OBSERVER', CENTER: "'500@399'", TLIST: `'${julianDate(timestamp).toFixed(8)}'`,
+    // Repo `julianDate` takes a Date; this function is handed an ISO string.
+    EPHEM_TYPE: 'OBSERVER', CENTER: "'500@399'", TLIST: `'${julianDate(new Date(timestamp)).toFixed(8)}'`,
     TLIST_TYPE: 'JD', TIME_TYPE: 'UT', TIME_DIGITS: 'FRACSEC', QUANTITIES: "'31'", CSV_FORMAT: 'YES',
   })
   return `${HORIZONS_ENDPOINT}?${parameters}`

@@ -282,3 +282,29 @@ about seats rather than bodies.
 
 One trap worth repeating: HTML attributes do not interpret `\uXXXX` escapes.
 A placeholder written that way renders the escape literally.
+
+## Deployment: the phone needs a hosted ephemeris
+
+The engine's three-tier fallback is really two tiers in a browser.
+
+1. **Codex ephemeris service** — works, and is the only path that yields real
+   sky in a browser. `server/server.js` now sends CORS headers and answers the
+   preflight; without them a cross-origin page cannot read it and the app falls
+   through to fixtures while looking like it worked.
+2. **Direct JPL Horizons** — impossible from a browser. Horizons returns no
+   `Access-Control-Allow-Origin` and answers `OPTIONS` with 405, so the fetch
+   always fails. The tier is kept for non-browser callers; the comment claiming
+   it "works in production" was wrong and has been corrected.
+3. **Fixtures** — golden-angle placeholders. Illustrative, never a sky.
+
+So a phone cannot reach `127.0.0.1:8787`, and it cannot reach Horizons either.
+For the app to give real readings away from this machine, the service has to be
+hosted somewhere the phone can see, with `ephemerisEndpoint` pointed at it (it
+is already an editable prop on the component). For testing on a phone on the
+same network, `SKY_HOST=0.0.0.0 npm run sky` binds beyond loopback — only on a
+network you trust. `SKY_ORIGIN` narrows the allowed origin from the default `*`.
+
+Verified in Chrome: with the service running, the note reads *"Glyph bodies:
+NASA/JPL Horizons via the Codex ephemeris service"* and the reading matches the
+Node run body for body — Hermes conjunct Mercury 0.48°, the six-body cluster at
+234.10°, Ascendant 117.13° holding Daedalus at 0.48°.
