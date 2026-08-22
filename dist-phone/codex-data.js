@@ -1653,13 +1653,25 @@ function themeOf(glyph) {
   return glyph?.function || null
 }
 
+// A seam body holds two seats, so a list built from seats names it twice. The
+// two seats are a real feature of the canon, but prose that says "Anubis,
+// Anubis" reads as a fault rather than as a seam. Name it once, and say so.
+function distinctNames(glyphList) {
+  const seen = new Set()
+  return glyphList.filter(glyph => {
+    if (!glyph || seen.has(glyph.name)) return false
+    seen.add(glyph.name)
+    return true
+  }).map(glyph => glyph.name + (glyph.seam ? ' (at both its seats)' : ''))
+}
+
 // --- Evidence records feeding src/synthesis.js -------------------------------
 
 function clusterEvidence(cluster, glyphs) {
   if (!cluster || cluster.members.length < 2) return null
   const seats = cluster.seats
   const named = seats.map(seat => glyphs.find(glyph => glyph.number === seat)).filter(Boolean)
-  const names = named.map(glyph => glyph.name)
+  const names = distinctNames(named)
   return {
     id: 'cluster',
     kind: 'cluster',
@@ -1677,7 +1689,7 @@ function clusterEvidence(cluster, glyphs) {
 function courtEvidence(courts) {
   return courts.filter(court => court.contacts.length).slice(0, 3).map((court, index) => {
     const tightest = court.contacts[0]
-    const names = court.contacts.map(contact => contact.glyph.name)
+    const names = distinctNames(court.contacts.map(contact => contact.glyph))
     return {
       id: `court-${court.body.name.toLowerCase()}`,
       kind: 'court',

@@ -153,3 +153,15 @@ test('seam seats do not duplicate the chords they form', () => {
     assert.notEqual(chord.first, chord.second, 'a seam body cannot chord with itself')
   }
 })
+
+test('synthesis prose names a seam body once, not twice', () => {
+  // Seat counts keep both seats (the measurement is about seats); the prose is
+  // about bodies, and "Anubis, Anubis" reads as a fault rather than as a seam.
+  const reading = pass({ birthplace: 'Kyoto, Japan' })
+  for (const passage of reading.synthesis.passages) {
+    const listed = passage.match(/court of \\d+: ([^.]+)\\./)
+    if (!listed) continue
+    const names = listed[1].split(',').map(part => part.replace(/\\(at both its seats\\)/, '').trim())
+    assert.equal(new Set(names).size, names.length, `a name repeats in: ${passage}`)
+  }
+})

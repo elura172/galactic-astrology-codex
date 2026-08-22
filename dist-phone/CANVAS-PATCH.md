@@ -82,10 +82,29 @@ Then let the note report what the angles actually did — replace the trailing
 
 ## 3 · Expose the new layers to the interface
 
-In `demoVals()`, extend `empty` and the returned object:
+In `demoVals()`, first add a helper beside `deg`. A seam body holds two seats
+at one longitude, so it contacts an angle or a planet twice at an identical orb;
+both rows are real, but printing `Osiris · 2.68° — Osiris · 2.68°` reads as a
+fault rather than as a seam:
 
 ```js
-    const empty = { demoActivations: [], demoConjunctions: [], demoCourts: [], demoChords: [], demoGates: [], demoBraid: [], demoAngles: [], demoCluster: null, demoSilence: '', demoSynthesis: '', demoSentence: '', readingNote: '' };
+    const seatNames = (contacts) => {
+      const seen = new Set();
+      return contacts.filter(c => { if (seen.has(c.glyph.name)) return false; seen.add(c.glyph.name); return true; })
+        .map(c => c.glyph.name + (c.glyph.seam ? ' (seam)' : '') + ' · ' + deg(c.orb)).join('  —  ');
+    };
+```
+
+Use it for the courts, replacing the existing `demoCourts` line:
+
+```js
+      demoCourts: d.courts.map(ct => ({ planet: ct.planet, count: ct.contacts.length, members: seatNames(ct.contacts) })),
+```
+
+Then extend `empty` and the returned object:
+
+```js
+    const empty = { demoActivations: [], demoConjunctions: [], demoCourts: [], demoChords: [], demoGates: [], demoBraid: [], demoAngles: [], demoCluster: null, demoSilence: '', demoPassages: [], demoSynthesis: '', demoSentence: '', readingNote: '' };
 ```
 
 ```js
@@ -107,9 +126,7 @@ In `demoVals()`, extend `empty` and the returned object:
       demoAngles: d.angles ? d.angles.map(a => ({
         label: a.label,
         degree: a.longitude.toFixed(2) + '°',
-        contacts: a.contacts.length
-          ? a.contacts.map(c => c.glyph.name + ' · ' + deg(c.orb)).join('  —  ')
-          : 'no seat within orb',
+        contacts: a.contacts.length ? seatNames(a.contacts) : 'no seat within orb',
       })) : [],
 ```
 
@@ -129,7 +146,8 @@ vocations this sky names *more than once*, across different gates:
 Replace the hand-rolled `demoSynthesis` line with the canon's own synthesis:
 
 ```js
-      demoSynthesis: d.synthesis.passages.join('\n\n'),
+      demoPassages: d.synthesis.passages.map((t, i) => ({ text: t, key: 'p' + i })),
+      demoSynthesis: d.synthesis.passages[0] || '',
       demoSentence: d.synthesis.sentence,
 ```
 
@@ -208,12 +226,20 @@ as part of the same instrument.
 </div>
 ```
 
-For the existing **Synthesis** section, add the final sentence beneath the
-passages:
+The canon composes the synthesis as several separate findings; joining them into
+one string renders as a wall of italic text. Replace the single
+`{{ demoSynthesis }}` div in the Synthesis section with a loop, and add the
+final sentence beneath:
 
 ```html
+<sc-for list="{{ demoPassages }}" as="pg" hint-placeholder-count="4">
+  <div style="margin-top:18px; font-family:'Cormorant Garamond',serif; font-style:italic; font-weight:300; font-size:19px; line-height:1.45; color:#0A0E15;">{{ pg.text }}</div>
+</sc-for>
 <div style="margin-top:14px; font-family:'Cormorant Garamond',serif; font-size:15px; line-height:1.6; color:#565047;">{{ demoSentence }}</div>
 ```
+
+`demoSynthesis` is kept as the first passage so any binding still reading it
+does not break.
 
 ---
 
@@ -239,3 +265,20 @@ coordinates themselves are unverified data. A wrong latitude yields a plausible
 wrong ascendant with no error, so treat that table as the least trustworthy
 input in the system — unlike the computed layers, nothing downstream can catch a
 typo in it. Entering `lat, lon` directly bypasses it entirely.
+
+## Verified in the browser
+
+Applied to the extracted component, rebundled, and run in Chrome over a static
+server. All seven layers render, the note reports `Angles: exact for Kyoto,
+Japan`, and the console is clean. A pre-built copy is at
+`~/Downloads/Galactic Astrology Codex (updated).html`.
+
+Two seam defects only became visible once it ran, and both are fixed above and
+in the engine: an angle listing the same seam body twice at an identical orb,
+and synthesis prose reading "a court of 3: Teharonhiawako, Anubis, Anubis". The
+engine now names a seam body once and marks it "(at both its seats)"; the seat
+*count* in the measurement still reports both seats, because that number is
+about seats rather than bodies.
+
+One trap worth repeating: HTML attributes do not interpret `\uXXXX` escapes.
+A placeholder written that way renders the escape literally.
