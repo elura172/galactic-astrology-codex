@@ -9,6 +9,11 @@ files/natal_resonance_pass.md
 node_modules/
 dist/
 .cache/
+.vercel/
+
+# The shippable page, assembled at deploy time from phone-shell/shell.html plus
+# the generated engine and the patched component. Rebuild: npm run build:bundle
+public/
 
 # Regenerable viewer (rebuild with: graphify export html)
 graphify-out/graph.html

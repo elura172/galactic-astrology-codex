@@ -4,16 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
     "sky": "node server/server.js",
-    "audit:reference": "node scripts/audit-reference.js",
-    "test": "node --test tests/*.test.js",
-    "build": "vite build",
-    "preview": "vite preview",
     "build:phone": "node scripts/build-phone-engine.js",
-    "check:phone": "node scripts/build-phone-engine.js --check"
-  },
-  "devDependencies": {
-    "vite": "^8.0.3"
+    "build:bundle": "node scripts/build-phone-bundle.js",
+    "check:phone": "node scripts/build-phone-engine.js --check",
+    "audit:reference": "node scripts/audit-reference.js",
+    "test": "node --test tests/*.test.js"
   }
 }
