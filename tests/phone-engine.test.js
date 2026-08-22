@@ -231,3 +231,34 @@ test('a refused request is not retried forever', async () => {
     globalThis.fetch = realFetch
   }
 })
+
+test('the service path reports progress while it works', async () => {
+  // A reading is 96 bodies in twelve round trips — 10-20s on a cold service.
+  // The direct-Horizons path reported progress; the path actually used did not,
+  // so the interface sat silent and re-pressable for the whole fetch.
+  const realFetch = globalThis.fetch
+  globalThis.fetch = async (url, options) => {
+    const { bodies, timestamp } = JSON.parse(options.body)
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ timestamp, placements: bodies.map((b, i) => ({ command: b.command, name: b.name, longitude: i, latitude: 0 })) }),
+    }
+  }
+  try {
+    const seen = []
+    const longitudes = await engine.fetchGlyphLongitudes(glyphs, INSTANT, '/api/ephemeris', p => seen.push(p))
+    const total = engine.uniqueBodies(glyphs).length
+
+    assert.ok(seen.length > 2, 'progress is reported per batch, not only at the end')
+    assert.deepEqual(seen[0], { completed: 0, total }, 'the first report lands before any waiting')
+    assert.deepEqual(seen.at(-1), { completed: total, total }, 'the last report accounts for every body')
+    assert.ok(seen.every(p => p.total === total), 'the total never moves')
+    for (let i = 1; i < seen.length; i += 1) {
+      assert.ok(seen[i].completed >= seen[i - 1].completed, 'progress never goes backwards')
+    }
+    assert.equal(longitudes.placements.length, total)
+  } finally {
+    globalThis.fetch = realFetch
+  }
+})

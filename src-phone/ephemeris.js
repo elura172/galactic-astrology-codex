@@ -63,16 +63,22 @@ async function fetchBatch(endpoint, timestamp, batch, attempts = 3) {
   throw last
 }
 
-export async function fetchGlyphLongitudes(glyphs, timestamp, endpoint) {
+// `onProgress` matters more than it looks: a reading is 96 bodies in twelve
+// round trips, and on a cold service that is 10-20 seconds. Without it the
+// service path reports nothing at all while it works — the direct path had
+// progress, the one actually used did not.
+export async function fetchGlyphLongitudes(glyphs, timestamp, endpoint, onProgress = () => {}) {
   const bodies = uniqueBodies(glyphs)
   const lonByName = new Map()
   const placements = []
+  onProgress({ completed: 0, total: bodies.length })
   for (let i = 0; i < bodies.length; i += 8) {
     const data = await fetchBatch(endpoint, timestamp, bodies.slice(i, i + 8))
     data.placements.forEach(p => {
       if (!lonByName.has(p.name)) lonByName.set(p.name, p.longitude)
       placements.push({ command: p.command, name: p.name, longitude: p.longitude, latitude: p.latitude })
     })
+    onProgress({ completed: placements.length, total: bodies.length })
   }
   return withPlacements(lonByName, placements)
 }

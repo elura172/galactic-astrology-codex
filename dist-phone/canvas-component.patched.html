@@ -1063,6 +1063,8 @@ class Component extends DCLogic {
   }
 
   async computeReadingPass() {
+    if (this.state.ephProgress) return;
+    this.setState({ ephProgress: 'Reading the sky \u2026' });
     const glyphs = this.state.glyphs;
     const instant = this.parseInstant() || '1988-03-12T04:32:00Z';
     const usedDefault = !this.parseInstant();
@@ -1071,7 +1073,9 @@ class Component extends DCLogic {
     const live = [...this.mod.planetLongitudes(now).filter(p => ['Sun', 'Venus', 'Mars'].includes(p.name)), { name: 'Moon', longitude: this.mod.moonLongitude(now) }];
     let lonByName, glyphSource;
     try {
-      lonByName = await this.mod.fetchGlyphLongitudes(glyphs, instant, this.props.ephemerisEndpoint ?? '/api/ephemeris');
+      lonByName = await this.mod.fetchGlyphLongitudes(glyphs, instant, this.props.ephemerisEndpoint ?? '/api/ephemeris', ({ completed, total }) => {
+        this.setState({ ephProgress: completed ? 'Reading the sky \u2014 ' + completed + ' of ' + total + ' bodies' : 'Reading the sky \u2026' });
+      });
       glyphSource = 'NASA/JPL Horizons via the Codex ephemeris service';
     } catch (e) {
       try {
@@ -1085,13 +1089,20 @@ class Component extends DCLogic {
         glyphSource = 'sample fixture \u2014 illustrative positions, not this sky. The reading could not reach the Codex ephemeris service, and JPL Horizons cannot be read from a browser directly';
       }
     }
-    this.setState({ ephProgress: '' });
-    const reading = this.mod.computeReading(glyphs, lonByName, natal, live, { instant, birthplace: this.state.birthPlace });
-    const note = 'Instant: ' + instant.replace('T', ' ').replace(':00.000Z', ' UT') + (usedDefault ? ' (default \u2014 date not parsed)' : '')
-      + '. Planets: computed, Keplerian, \u00B1arcminutes. Glyph bodies: ' + glyphSource
-      + '. Today\u2019s sky: computed for now, Moon included (\u00B10.1\u00B0)'
-      + (reading.angles ? '. Angles: ' + reading.angleConfidence + ' for ' + reading.birthplace.label + '.' : '. Angles: silent \u2014 no birthplace resolved.');
-    this.setState({ begun: true, reading, readingNote: note });
+    // One setState for the finished reading, and the busy flag released in the
+    // same breath — cleared early, a failure below would leave the button live
+    // and the reading absent, which reads as the press having done nothing.
+    try {
+      const reading = this.mod.computeReading(glyphs, lonByName, natal, live, { instant, birthplace: this.state.birthPlace });
+      const note = 'Instant: ' + instant.replace('T', ' ').replace(':00.000Z', ' UT') + (usedDefault ? ' (default \u2014 date not parsed)' : '')
+        + '. Planets: computed, Keplerian, \u00B1arcminutes. Glyph bodies: ' + glyphSource
+        + '. Today\u2019s sky: computed for now, Moon included (\u00B10.1\u00B0)'
+        + (reading.angles ? '. Angles: ' + reading.angleConfidence + ' for ' + reading.birthplace.label + '.' : '. Angles: silent \u2014 no birthplace resolved.');
+      this.setState({ begun: true, reading, readingNote: note, ephProgress: '' });
+    } catch (fatal) {
+      console.error('[codex] the reading could not be composed', fatal);
+      this.setState({ ephProgress: '', begun: false, reading: null, readingNote: 'The reading could not be composed: ' + (fatal && fatal.message ? fatal.message : 'unknown error') + '. Nothing has been invented in its place.' });
+    }
   }
 
   demoVals(glyphs, begun, openSeat) {
