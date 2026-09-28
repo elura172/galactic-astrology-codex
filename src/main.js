@@ -7,6 +7,7 @@ import { conjunction } from './astrology.js'
 import { angleContacts, crossChartActivations, densestCluster, planetaryCourts, populatedCourts, strongestChords } from './reading.js'
 import { chordTransmission, composeActivationTransmission, composeTransmission, finalSentence } from './synthesis.js'
 import { buildSynthesisPacket } from './synthesis-packet.js'
+import { defaultTimezone, isValidTimezone, searchCities, searchOfflineCities, supportedTimezones } from './cities.js'
 
 const COLORS = [
   '#748c83', '#7893a3', '#9a7892', '#a45743', '#c29854',
@@ -116,10 +117,23 @@ app.innerHTML = `
       <div class="birth-fields" data-birth-fields hidden>
         <fieldset class="entry-stage"><legend><b>02</b>Time confidence</legend><select name="confidence"><option value="exact">Exact · angles and houses included</option><option value="approximate">Approximate · angles marked provisional</option><option value="unknown">Unknown · angles and houses withheld</option></select><p>Choose the confidence of the recorded clock time, not the date.</p></fieldset>
         <fieldset class="entry-stage"><legend><b>03</b>Place and timezone</legend>
-          <label>Birthplace note <input name="place" autocomplete="off" placeholder="City, country · optional local note"></label>
-          <div class="coordinate-fields" data-coordinate-fields><label>Latitude<input name="latitude" type="number" min="-90" max="90" step="any" placeholder="43.6532"></label><label>Longitude<input name="longitude" type="number" min="-180" max="180" step="any" placeholder="-79.3832"></label></div>
-          <label>Confirmed timezone<input name="timezone" required placeholder="America/Toronto" autocomplete="off" aria-describedby="timezone-help"></label>
+          <div class="place-search-shell">
+            <label>City & birthplace
+              <input name="place" autocomplete="off" placeholder="Search city (e.g. Toronto, Paris, London, Tokyo)" aria-autocomplete="list" aria-controls="city-dropdown" aria-expanded="false">
+            </label>
+            <div class="city-dropdown" id="city-dropdown" data-city-dropdown hidden role="listbox" aria-label="City suggestions"></div>
+            <p class="place-resolved-badge" data-place-badge hidden></p>
+          </div>
+          <div class="coordinate-fields" data-coordinate-fields>
+            <label>Latitude<input name="latitude" type="number" min="-90" max="90" step="any" placeholder="43.6532"></label>
+            <label>Longitude<input name="longitude" type="number" min="-180" max="180" step="any" placeholder="-79.3832"></label>
+          </div>
+          <label>Confirmed timezone
+            <input name="timezone" required list="timezone-list" placeholder="America/Toronto" autocomplete="off" aria-describedby="timezone-help">
+          </label>
+          <datalist id="timezone-list" data-timezone-list></datalist>
           <p id="timezone-help">Use an IANA timezone such as America/Toronto. Coordinates and timezone are confirmed directly; the birthplace note remains on this device.</p>
+          <p class="timezone-validation-note" data-timezone-note></p>
         </fieldset>
       </div>
       <div class="sky-privacy"><i>◇</i><p><b>Transient by design</b>Nothing entered here is saved. The ephemeris service receives only the selected instant and canonical body identifiers.</p></div>
@@ -495,7 +509,115 @@ function toggleSkyDrawer(open = !state.skyOpen) {
   skyDrawer.classList.toggle('is-open', open)
   skyDrawer.setAttribute('aria-hidden', String(!open))
   document.querySelector('[data-sky-open]').setAttribute('aria-expanded', String(open))
-  if (open) skyDrawer.querySelector('input')?.focus()
+  if (open) {
+    if (skyDrawer.dataset.kind === 'birth') initBirthFields()
+    skyDrawer.querySelector('input')?.focus()
+  }
+}
+
+let citySearchController = null
+let activeCityResults = []
+let activeCityIndex = -1
+
+function initBirthFields() {
+  const form = document.querySelector('[data-sky-form]')
+  if (!form) return
+
+  const datalist = form.querySelector('[data-timezone-list]')
+  if (datalist && !datalist.children.length) {
+    datalist.innerHTML = supportedTimezones().map(tz => `<option value="${escapeHtml(tz)}"></option>`).join('')
+  }
+
+  if (!form.elements.timezone.value) {
+    form.elements.timezone.value = defaultTimezone()
+  }
+  updateTimezoneValidation(form.elements.timezone.value)
+}
+
+function updateTimezoneValidation(tz) {
+  const note = document.querySelector('[data-timezone-note]')
+  if (!note) return
+  const clean = (tz || '').trim()
+  if (!clean) {
+    note.textContent = 'Enter an IANA timezone (e.g. America/Toronto, Europe/Paris)'
+    note.className = 'timezone-validation-note is-warning'
+    return
+  }
+  if (isValidTimezone(clean)) {
+    try {
+      const timeStr = new Intl.DateTimeFormat('en-US', { timeZone: clean, hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }).format(new Date())
+      note.textContent = `✓ Confirmed IANA zone · current time ${timeStr}`
+      note.className = 'timezone-validation-note is-valid'
+    } catch {
+      note.textContent = '✓ Confirmed IANA timezone'
+      note.className = 'timezone-validation-note is-valid'
+    }
+  } else {
+    note.textContent = '⚠ Unrecognized IANA timezone name (e.g. America/Toronto, Europe/Paris, UTC)'
+    note.className = 'timezone-validation-note is-error'
+  }
+}
+
+function renderCityDropdown(cities) {
+  const dropdown = document.querySelector('[data-city-dropdown]')
+  const input = document.querySelector('[name="place"]')
+  if (!dropdown) return
+
+  activeCityResults = cities
+  activeCityIndex = -1
+
+  if (!cities.length) {
+    dropdown.hidden = true
+    input?.setAttribute('aria-expanded', 'false')
+    dropdown.innerHTML = ''
+    return
+  }
+
+  dropdown.innerHTML = cities.map((city, index) => {
+    const latStr = city.latitude >= 0 ? `${city.latitude.toFixed(2)}°N` : `${Math.abs(city.latitude).toFixed(2)}°S`
+    const lonStr = city.longitude >= 0 ? `${city.longitude.toFixed(2)}°E` : `${Math.abs(city.longitude).toFixed(2)}°W`
+    return `<button type="button" class="city-option" role="option" data-city-index="${index}">
+      <span class="city-option__title"><strong>${escapeHtml(city.name)}</strong><span>${escapeHtml([city.admin1, city.country].filter(Boolean).join(', '))}</span></span>
+      <span class="city-option__meta"><span>${latStr}, ${lonStr}</span><span>·</span><span>${escapeHtml(city.timezone)}</span></span>
+    </button>`
+  }).join('')
+
+  dropdown.hidden = false
+  input?.setAttribute('aria-expanded', 'true')
+
+  dropdown.querySelectorAll('.city-option').forEach(button => {
+    button.addEventListener('click', () => {
+      selectCity(activeCityResults[Number(button.dataset.cityIndex)])
+    })
+  })
+}
+
+function selectCity(city) {
+  if (!city) return
+  const form = document.querySelector('[data-sky-form]')
+  if (!form) return
+
+  form.elements.place.value = city.displayName
+  form.elements.latitude.value = city.latitude
+  form.elements.longitude.value = city.longitude
+  form.elements.timezone.value = city.timezone
+
+  updateTimezoneValidation(city.timezone)
+
+  const badge = document.querySelector('[data-place-badge]')
+  if (badge) {
+    badge.hidden = false
+    const latStr = city.latitude >= 0 ? `${city.latitude.toFixed(2)}°N` : `${Math.abs(city.latitude).toFixed(2)}°S`
+    const lonStr = city.longitude >= 0 ? `${city.longitude.toFixed(2)}°E` : `${Math.abs(city.longitude).toFixed(2)}°W`
+    badge.textContent = `✓ Set: ${city.displayName} (${latStr}, ${lonStr} · ${city.timezone})`
+  }
+
+  const dropdown = document.querySelector('[data-city-dropdown]')
+  if (dropdown) {
+    dropdown.hidden = true
+    dropdown.innerHTML = ''
+  }
+  form.elements.place.setAttribute('aria-expanded', 'false')
 }
 
 function setSkyKind(kind) {
@@ -505,6 +627,7 @@ function setSkyKind(kind) {
   birthFields.querySelectorAll('input, select').forEach(input => { input.disabled = kind !== 'birth' })
   skyDrawer.dataset.kind = kind
   if (kind === 'live') skyDrawer.querySelector('[name="moment"]').value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+  if (kind === 'birth') initBirthFields()
   updateBirthConfidence()
 }
 
@@ -832,8 +955,95 @@ document.querySelector('[data-reference-chart]').addEventListener('click', () =>
   form.elements.latitude.value = '0'
   form.elements.longitude.value = '0'
   form.elements.timezone.value = 'UTC'
+  updateTimezoneValidation('UTC')
+  const badge = document.querySelector('[data-place-badge]')
+  if (badge) {
+    badge.hidden = false
+    badge.textContent = '✓ Reference: Greenwich (0.00°N, 0.00°E · UTC)'
+  }
   document.querySelector('[data-sky-status]').textContent = 'Synthetic public reference loaded · submit when ready'
 })
+
+const placeInput = document.querySelector('[name="place"]')
+let placeDebounce = null
+
+placeInput?.addEventListener('input', () => {
+  const query = placeInput.value.trim()
+  clearTimeout(placeDebounce)
+
+  if (citySearchController) {
+    citySearchController.abort()
+    citySearchController = null
+  }
+
+  if (query.length < 2) {
+    renderCityDropdown([])
+    return
+  }
+
+  // Instant offline matches first so dropdown appears immediately
+  const offline = searchOfflineCities(query, 6)
+  if (offline.length) {
+    renderCityDropdown(offline)
+  }
+
+  placeDebounce = setTimeout(async () => {
+    citySearchController = new AbortController()
+    try {
+      const results = await searchCities(query, { signal: citySearchController.signal })
+      renderCityDropdown(results)
+    } catch (err) {
+      if (err.name !== 'AbortError') console.error('City search failed:', err)
+    } finally {
+      citySearchController = null
+    }
+  }, 180)
+})
+
+placeInput?.addEventListener('keydown', event => {
+  const dropdown = document.querySelector('[data-city-dropdown]')
+  if (!dropdown || dropdown.hidden || !activeCityResults.length) return
+
+  const options = dropdown.querySelectorAll('.city-option')
+
+  if (event.key === 'ArrowDown') {
+    event.preventDefault()
+    activeCityIndex = (activeCityIndex + 1) % options.length
+    options.forEach((opt, idx) => opt.classList.toggle('is-focused', idx === activeCityIndex))
+    options[activeCityIndex]?.scrollIntoView({ block: 'nearest' })
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault()
+    activeCityIndex = (activeCityIndex - 1 + options.length) % options.length
+    options.forEach((opt, idx) => opt.classList.toggle('is-focused', idx === activeCityIndex))
+    options[activeCityIndex]?.scrollIntoView({ block: 'nearest' })
+  } else if (event.key === 'Enter') {
+    if (activeCityIndex >= 0 && activeCityIndex < activeCityResults.length) {
+      event.preventDefault()
+      selectCity(activeCityResults[activeCityIndex])
+    }
+  } else if (event.key === 'Escape') {
+    dropdown.hidden = true
+    placeInput.setAttribute('aria-expanded', 'false')
+  }
+})
+
+document.addEventListener('click', event => {
+  const shell = document.querySelector('.place-search-shell')
+  const dropdown = document.querySelector('[data-city-dropdown]')
+  if (dropdown && !dropdown.hidden && shell && !shell.contains(event.target)) {
+    dropdown.hidden = true
+    placeInput?.setAttribute('aria-expanded', 'false')
+  }
+})
+
+const timezoneInput = document.querySelector('[name="timezone"]')
+timezoneInput?.addEventListener('input', () => {
+  updateTimezoneValidation(timezoneInput.value)
+})
+timezoneInput?.addEventListener('change', () => {
+  updateTimezoneValidation(timezoneInput.value)
+})
+
 setSkyKind('live')
 
 document.querySelector('#glyph-search').addEventListener('input', event => {

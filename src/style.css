@@ -463,6 +463,81 @@ input:focus-visible,
 .coordinate-fields.is-withheld { opacity: .38; }
 .coordinate-fields.is-withheld::after { content: 'Withheld for unknown birth time'; grid-column: 1 / -1; color: var(--rose); font: 7px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
 .birth-fields > p { color: var(--quiet); font: italic 12px/1.5 var(--serif); }
+
+.place-search-shell { position: relative; }
+.city-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  max-height: 220px;
+  overflow-y: auto;
+  margin-top: 4px;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+}
+.city-option {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.city-option:last-child { border-bottom: 0; }
+.city-option:hover, .city-option.is-focused {
+  background: rgba(32, 32, 29, 0.08);
+}
+.city-option__title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.city-option__title strong {
+  font: 13px var(--serif);
+  color: var(--ink);
+}
+.city-option__title span {
+  font: 10px var(--sans);
+  color: var(--quiet);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.city-option__meta {
+  display: flex;
+  gap: 6px;
+  margin-top: 3px;
+  color: var(--quiet);
+  font: 8px var(--mono);
+  text-transform: uppercase;
+}
+.place-resolved-badge {
+  display: block;
+  margin: 6px 0 0;
+  color: var(--gold);
+  font: 8px var(--mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.timezone-validation-note {
+  display: block;
+  margin: 6px 0 0;
+  color: var(--quiet);
+  font: 8px var(--mono);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.timezone-validation-note.is-valid { color: #436d5b; }
+.timezone-validation-note.is-warning { color: var(--gold); }
+.timezone-validation-note.is-error { color: var(--rose); }
+
 .sky-privacy { display: grid; grid-template-columns: auto 1fr; gap: 10px; margin: 26px 0; padding: 13px; border: 1px solid var(--rule); }
 .sky-privacy i { color: var(--gold); font-style: normal; }
 .sky-privacy p { margin: 0; color: var(--quiet); font: 10px/1.5 var(--sans); }

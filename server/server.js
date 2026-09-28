@@ -5,11 +5,45 @@ import { cacheKey, horizonsUrl, mapConcurrent, parseHorizonsPlacement } from './
 
 const port = Number(process.env.SKY_PORT || 8787)
 const cacheDirectory = new URL('../.cache/ephemeris/', import.meta.url)
+const geocodeCacheDirectory = new URL('../.cache/geocode/', import.meta.url)
 await mkdir(cacheDirectory, { recursive: true })
+await mkdir(geocodeCacheDirectory, { recursive: true })
 
 function json(response, status, body) {
   response.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
   response.end(JSON.stringify(body))
+}
+
+function geocodeCacheKey(query) {
+  return query.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_').slice(0, 60)
+}
+
+async function geocodeCity(query) {
+  const safeKey = geocodeCacheKey(query)
+  const path = join(geocodeCacheDirectory.pathname, `${safeKey}.json`)
+  try {
+    return JSON.parse(await readFile(path, 'utf8'))
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error
+  }
+  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=10&language=en&format=json`
+  const upstream = await fetch(url, { signal: AbortSignal.timeout(6000) })
+  if (!upstream.ok) throw new Error(`Geocoding failed with HTTP ${upstream.status}`)
+  const data = await upstream.json()
+  const results = (data.results || []).map(item => ({
+    id: item.id,
+    name: item.name,
+    admin1: item.admin1 || '',
+    country: item.country || '',
+    latitude: item.latitude,
+    longitude: item.longitude,
+    elevation: item.elevation,
+    timezone: item.timezone || 'UTC',
+    countryCode: item.country_code || '',
+    displayName: [item.name, item.admin1 && item.admin1 !== item.name ? item.admin1 : null, item.country].filter(Boolean).join(', '),
+  }))
+  await writeFile(path, JSON.stringify(results), { mode: 0o600 })
+  return results
 }
 
 async function requestBody(request) {
@@ -52,8 +86,20 @@ async function placement(body, timestamp) {
 }
 
 createServer(async (request, response) => {
-  if (request.method === 'GET' && request.url === '/health') return json(response, 200, { ok: true, service: 'codex-ephemeris' })
-  if (request.method !== 'POST' || request.url !== '/api/ephemeris') return json(response, 404, { error: 'Not found.' })
+  const parsedUrl = new URL(request.url, `http://127.0.0.1:${port}`)
+  if (request.method === 'GET' && parsedUrl.pathname === '/health') return json(response, 200, { ok: true, service: 'codex-ephemeris' })
+  if (request.method === 'GET' && parsedUrl.pathname === '/api/geocode') {
+    const query = (parsedUrl.searchParams.get('q') || parsedUrl.searchParams.get('name') || '').trim()
+    if (query.length < 2) return json(response, 200, { query, results: [] })
+    if (query.length > 100) return json(response, 400, { error: 'Query is too long.' })
+    try {
+      const results = await geocodeCity(query)
+      return json(response, 200, { query, results })
+    } catch (error) {
+      return json(response, 200, { query, results: [], error: error.message })
+    }
+  }
+  if (request.method !== 'POST' || parsedUrl.pathname !== '/api/ephemeris') return json(response, 404, { error: 'Not found.' })
   try {
     const input = validate(await requestBody(request))
     const placements = await mapConcurrent(input.bodies, 2, body => placement(body, input.timestamp))
