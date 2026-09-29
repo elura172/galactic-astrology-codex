@@ -927,7 +927,9 @@ function renderReadingFolio() {
 
 async function calculateSky(event) {
   event.preventDefault()
-  const form = new FormData(event.currentTarget)
+  const formElement = event.currentTarget
+  const submitButton = formElement?.querySelector('button[type="submit"]')
+  const form = new FormData(formElement)
   const kind = skyDrawer.dataset.kind || 'live'
   const confidence = form.get('confidence')
   const isHelio = state.perspective === 'heliocentric'
@@ -955,7 +957,7 @@ async function calculateSky(event) {
   const status = document.querySelector('[data-sky-status]')
   const majorBodies = isHelio ? HELIOCENTRIC_MAJOR_BODIES : MAJOR_BODIES
   status.textContent = `Opening the ephemeris · 96 glyph bodies + ${majorBodies.length} planetary points (${isHelio ? 'heliocentric' : 'geocentric'})`
-  event.currentTarget.querySelector('button[type="submit"]').disabled = true
+  if (submitButton) submitButton.disabled = true
   const progress = document.querySelector('[data-calculation-progress]')
   progress.hidden = false
   state.skyController?.abort()
@@ -1018,7 +1020,7 @@ async function calculateSky(event) {
   } catch (error) {
     status.textContent = error.name === 'AbortError' ? 'Calculation cancelled · received placements remain visible and cached' : error.message
   } finally {
-    event.currentTarget.querySelector('button[type="submit"]').disabled = false
+    if (submitButton) submitButton.disabled = false
     progress.hidden = true
     state.skyController = null
   }
