@@ -22,28 +22,28 @@ export function zodiacLabel(longitude) {
   return `${(normalized % 30).toFixed(2)}° ${signs[sign]}`
 }
 
-export async function fetchEphemerisInBatches({ timestamp, bodies, batchSize = 8, signal, fetcher = fetch, endpoint = '/api/ephemeris', onProgress = () => {} }) {
+export async function fetchEphemerisInBatches({ timestamp, bodies, center = 'geocentric', batchSize = 8, signal, fetcher = fetch, endpoint = '/api/ephemeris', onProgress = () => {} }) {
   const placements = []
   for (let start = 0; start < bodies.length; start += batchSize) {
     if (signal?.aborted) throw new DOMException('The ephemeris calculation was cancelled.', 'AbortError')
     const batch = bodies.slice(start, start + batchSize)
     const response = await fetcher(endpoint, {
       method: 'POST', headers: { 'content-type': 'application/json' }, signal,
-      body: JSON.stringify({ timestamp, bodies: batch }),
+      body: JSON.stringify({ timestamp, bodies: batch, center }),
     })
     const result = await response.json()
     if (!response.ok) throw new Error(result.error || 'The ephemeris could not be opened.')
     placements.push(...result.placements)
     onProgress({ completed: placements.length, total: bodies.length, placements: [...placements] })
   }
-  return { timestamp, placements, source: 'NASA/JPL Horizons' }
+  return { timestamp, center, placements, source: 'NASA/JPL Horizons' }
 }
 
-export function technicalRecord({ timestamp, mode, placements, planets, angles, houses, angleConfidence }) {
+export function technicalRecord({ timestamp, mode, center = 'geocentric', placements, planets, angles, houses, angleConfidence }) {
   return {
     schema: 'celestial-glyphs/technical-record/v1',
     generatedAt: new Date().toISOString(),
-    chart: { timestamp, mode, center: 'geocentric', frame: 'apparent ecliptic-of-date', source: 'NASA/JPL Horizons' },
+    chart: { timestamp, mode, center, frame: center === 'heliocentric' ? 'heliocentric ecliptic-of-date' : 'apparent ecliptic-of-date', source: 'NASA/JPL Horizons' },
     countingRules: { glyphClusters: 'unique catalogue bodies', canonicalDisplay: 'all 108 seats including seams and invoked presences' },
     glyphPlacements: [...placements.values()].map(({ command, seat, name, longitude, latitude }) => ({ command, seat, name, longitude, latitude })),
     planetaryPlacements: planets.map(({ command, name, longitude, latitude }) => ({ command, name, longitude, latitude })),

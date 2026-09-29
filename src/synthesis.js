@@ -1,5 +1,5 @@
 const TIER_WEIGHT = { exact: 34, lattice: 34, working: 22, whisper: 10 }
-const KIND_WEIGHT = { cluster: 46, angle: 42, court: 40, chord: 34, resonance: 24 }
+const KIND_WEIGHT = { cluster: 46, angle: 42, node: 42, court: 40, chord: 34, resonance: 24 }
 
 export function evidenceScore(evidence) {
   const kind = KIND_WEIGHT[evidence.kind] || 0

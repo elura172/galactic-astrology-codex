@@ -64,22 +64,23 @@ function validate(body) {
   body.bodies.forEach(item => {
     if (!/^\d+;?$/.test(item.command)) throw new Error('Every body requires a numeric Horizons command.')
   })
-  return { timestamp: timestamp.toISOString(), bodies: body.bodies }
+  const center = body.center === 'heliocentric' ? 'heliocentric' : 'geocentric'
+  return { timestamp: timestamp.toISOString(), bodies: body.bodies, center }
 }
 
-async function placement(body, timestamp) {
-  const path = join(cacheDirectory.pathname, `${cacheKey(body.command, timestamp)}.json`)
+async function placement(body, timestamp, center = 'geocentric') {
+  const path = join(cacheDirectory.pathname, `${cacheKey(body.command, timestamp, center)}.json`)
   try {
     return JSON.parse(await readFile(path, 'utf8'))
   } catch (error) {
     if (error.code !== 'ENOENT') throw error
   }
-  const response = await fetch(horizonsUrl(body.command, timestamp), { signal: AbortSignal.timeout(30000) })
+  const response = await fetch(horizonsUrl(body.command, timestamp, center), { signal: AbortSignal.timeout(30000) })
   if (!response.ok) throw new Error(`Horizons request failed with HTTP ${response.status}.`)
   const position = parseHorizonsPlacement(await response.json())
   const result = {
     command: body.command, seat: body.seat ?? null, name: body.name ?? null, ...position, timestamp,
-    center: 'geocentric', frame: 'apparent ecliptic-of-date', source: 'NASA/JPL Horizons',
+    center, frame: center === 'heliocentric' ? 'heliocentric ecliptic-of-date' : 'apparent ecliptic-of-date', source: 'NASA/JPL Horizons',
   }
   await writeFile(path, JSON.stringify(result), { mode: 0o600 })
   return result
@@ -102,8 +103,8 @@ createServer(async (request, response) => {
   if (request.method !== 'POST' || parsedUrl.pathname !== '/api/ephemeris') return json(response, 404, { error: 'Not found.' })
   try {
     const input = validate(await requestBody(request))
-    const placements = await mapConcurrent(input.bodies, 2, body => placement(body, input.timestamp))
-    return json(response, 200, { timestamp: input.timestamp, placements, source: 'NASA/JPL Horizons' })
+    const placements = await mapConcurrent(input.bodies, 2, body => placement(body, input.timestamp, input.center))
+    return json(response, 200, { timestamp: input.timestamp, center: input.center, placements, source: 'NASA/JPL Horizons' })
   } catch (error) {
     return json(response, 400, { error: error.message })
   }
