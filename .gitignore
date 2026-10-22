@@ -8,6 +8,7 @@ files/natal_resonance_pass.md
 # Local build products and dependencies
 node_modules/
 dist/
+public/
 .cache/
 
 # Regenerable viewer (rebuild with: graphify export html)

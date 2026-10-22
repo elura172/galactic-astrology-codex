@@ -262,6 +262,10 @@ input:focus-visible,
 .sky-button { display: flex; align-items: center; gap: 10px; padding: 7px 8px 7px 12px; border: 1px solid var(--ink); background: transparent; font: 9px var(--mono); letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
 .sky-button b { display: grid; place-items: center; width: 27px; height: 27px; color: var(--ink); border: 1px solid var(--ink); border-radius: 50%; font: 13px var(--serif); }
 
+.phone-button { display: flex; align-items: center; gap: 10px; padding: 7px 8px 7px 12px; border: 1px solid var(--ink); background: transparent; color: var(--ink); text-decoration: none; font: 9px var(--mono); letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+.phone-button b { display: grid; place-items: center; width: 27px; height: 27px; color: var(--ink); border: 1px solid var(--ink); border-radius: 50%; font: 11px var(--mono); }
+.phone-button:hover { background: rgba(0, 0, 0, 0.05); }
+
 .index-button b { display: grid; place-items: center; width: 27px; height: 27px; color: var(--paper); background: var(--ink); }
 
 .workbench {
@@ -788,6 +792,7 @@ input:focus-visible,
   .wordmark small { display: none; }
   .index-button span { display: none; }
   .sky-button span { display: none; }
+  .phone-button span { display: none; }
   .mode-switch button { min-width: 0; }
   .plot-shell { min-height: 520px; }
   .plot-heading { padding: 0 12px; }

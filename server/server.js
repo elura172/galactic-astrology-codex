@@ -64,7 +64,7 @@ function validate(body) {
   body.bodies.forEach(item => {
     if (!/^\d+;?$/.test(item.command)) throw new Error('Every body requires a numeric Horizons command.')
   })
-  const center = body.center === 'heliocentric' ? 'heliocentric' : 'geocentric'
+  const center = (body.center || body.frame) === 'heliocentric' ? 'heliocentric' : 'geocentric'
   return { timestamp: timestamp.toISOString(), bodies: body.bodies, center }
 }
 

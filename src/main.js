@@ -73,6 +73,7 @@ app.innerHTML = `
         <span>Astral chamber</span><b>◫</b>
       </button>
       <button class="sky-button" data-sky-open aria-expanded="false"><span>Set the sky</span><b>☉</b></button>
+      <a class="phone-button" href="/phone" title="Open mobile Canvas view"><span>Phone</span><b>📱</b></a>
     </header>
 
     <section class="workbench">

@@ -2,15 +2,30 @@ import { createHash } from 'node:crypto'
 
 export const HORIZONS_ENDPOINT = 'https://ssd.jpl.nasa.gov/api/horizons.api'
 
+// The Codex is read from the Sun by default in the phone interface,
+// and supports both heliocentric and geocentric reference frames.
+export const CENTERS = {
+  heliocentric: '500@10',
+  geocentric: '500@399',
+}
+export const DEFAULT_CENTER = CENTERS.heliocentric
+
+export function centerFor(frame) {
+  if (!frame) return DEFAULT_CENTER
+  if (CENTERS[frame]) return CENTERS[frame]
+  if (Object.values(CENTERS).includes(frame)) return frame
+  throw new TypeError(`Unknown frame "${frame}" — expected heliocentric or geocentric.`)
+}
+
 export function julianDate(value) {
   const milliseconds = new Date(value).getTime()
   if (!Number.isFinite(milliseconds)) throw new TypeError('Timestamp must be a valid ISO date.')
   return milliseconds / 86400000 + 2440587.5
 }
 
-export function horizonsUrl(command, timestamp, center = 'geocentric') {
+export function horizonsUrl(command, timestamp, frame = 'geocentric') {
   if (!/^\d+;?$/.test(command)) throw new TypeError('Horizons command must be a numeric major-body ID or small-body number followed by a semicolon.')
-  const centerCode = center === 'heliocentric' ? '500@10' : '500@399'
+  const centerCode = centerFor(frame)
   const parameters = new URLSearchParams({
     format: 'json', COMMAND: `'${command}'`, OBJ_DATA: 'NO', MAKE_EPHEM: 'YES',
     EPHEM_TYPE: 'OBSERVER', CENTER: `'${centerCode}'`, TLIST: `'${julianDate(timestamp).toFixed(8)}'`,
@@ -32,8 +47,8 @@ export function parseHorizonsPlacement(payload) {
   return { longitude, latitude }
 }
 
-export function cacheKey(command, timestamp, center = 'geocentric') {
-  const centerCode = center === 'heliocentric' ? '500@10' : '500@399'
+export function cacheKey(command, timestamp, frame = 'geocentric') {
+  const centerCode = centerFor(frame)
   return createHash('sha256').update(`${command}|${new Date(timestamp).toISOString()}|${centerCode}|31`).digest('hex')
 }
 
