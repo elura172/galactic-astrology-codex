@@ -97,3 +97,21 @@ export function crossChartActivations(glyphs, natalPlacements, natalPlanets, liv
 
   return { glyphContacts, planetaryChords }
 }
+
+export function decagonalNodeContacts(glyphs, placementsBySeat, planets = [], nodes = []) {
+  const tierRank = { exact: 0, working: 1, whisper: 2 }
+  return nodes.map(node => {
+    const planetContacts = planets.flatMap(planet => {
+      const contact = conjunction(planet.longitude, node.angle)
+      return contact ? [{ kind: 'planet', name: planet.name, symbol: planet.symbol, placement: planet, ...contact }] : []
+    })
+    const glyphContacts = glyphs.flatMap(glyph => {
+      const placement = placementsBySeat.get(glyph.number)
+      if (!placement) return []
+      const contact = conjunction(placement.longitude, node.angle)
+      return contact ? [{ kind: 'glyph', glyph, placement, ...contact }] : []
+    })
+    const contacts = [...planetContacts, ...glyphContacts].sort((a, b) => tierRank[a.tier] - tierRank[b.tier] || a.orb - b.orb)
+    return { node, contacts }
+  })
+}

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { angleContacts, crossChartActivations, densestCluster, planetaryCourts, populatedCourts, strongestChords } from '../src/reading.js'
+import { angleContacts, crossChartActivations, decagonalNodeContacts, densestCluster, planetaryCourts, populatedCourts, strongestChords } from '../src/reading.js'
 
 const glyphs = [
   { number: 1, name: 'Near Sun' },
@@ -85,3 +85,40 @@ test('derives explicit live-to-natal glyph contacts and planetary chords', () =>
   assert.equal(result.planetaryChords[0].aspect, 'Gift')
   assert.ok(Math.abs(result.planetaryChords[0].orb - .5) < .001)
 })
+
+test('decagonalNodeContacts maps planetary and glyph conjunctions to the 10 Golden Node gates', () => {
+  const testNodes = [
+    { index: 1, angle: 0, gate: 'Vow Crown', face: 'I', lineage: 'Vega' },
+    { index: 2, angle: 36, gate: 'Signal Path', face: 'II', lineage: 'Lyra' },
+  ]
+  const testGlyphs = [
+    { number: 1, name: 'Near Node 1' },
+    { number: 2, name: 'Far Away' },
+  ]
+  const testPlacements = new Map([
+    [1, { longitude: 0.4 }],
+    [2, { longitude: 180 }],
+  ])
+  const testPlanets = [
+    { command: '399', name: 'Earth', symbol: '⊕', longitude: 35.8 },
+  ]
+
+  const records = decagonalNodeContacts(testGlyphs, testPlacements, testPlanets, testNodes)
+  assert.equal(records.length, 2)
+  // Node 1 (0°) has glyph 1 at 0.4° (orb 0.4, exact)
+  assert.equal(records[0].node.gate, 'Vow Crown')
+  assert.equal(records[0].contacts.length, 1)
+  assert.equal(records[0].contacts[0].kind, 'glyph')
+  assert.equal(records[0].contacts[0].glyph.number, 1)
+  assert.equal(records[0].contacts[0].tier, 'exact')
+  assert.ok(Math.abs(records[0].contacts[0].orb - 0.4) < 1e-9)
+
+  // Node 2 (36°) has Earth at 35.8° (orb 0.2, exact)
+  assert.equal(records[1].node.gate, 'Signal Path')
+  assert.equal(records[1].contacts.length, 1)
+  assert.equal(records[1].contacts[0].kind, 'planet')
+  assert.equal(records[1].contacts[0].name, 'Earth')
+  assert.equal(records[1].contacts[0].tier, 'exact')
+  assert.ok(Math.abs(records[1].contacts[0].orb - 0.2) < 1e-9)
+})
+

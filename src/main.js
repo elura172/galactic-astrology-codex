@@ -2,12 +2,13 @@ import './style.css'
 import codexMarkdown from '../codex_of_celestial_glyphs.md?raw'
 import { GROUPS, CHORDS, parseCodex, seamCounterpart, chordDestinations, adjacentFaces, relatedGlyphNumbers, classifiedRelationships } from './codex.js'
 import { fetchEphemerisInBatches, placementsBySeat, technicalRecord, uniqueMeasuredBodies, zodiacLabel } from './sky.js'
-import { chartAngles, houseForLongitude, lineageHouseResonance, MAJOR_BODIES, wholeSignHouses, zonedDateTime } from './chart.js'
+import { DECAGONAL_NODES, HELIOCENTRIC_MAJOR_BODIES, MAJOR_BODIES, chartAngles, houseForLongitude, lineageHouseResonance, wholeSignHouses, zonedDateTime } from './chart.js'
 import { conjunction } from './astrology.js'
-import { angleContacts, crossChartActivations, densestCluster, planetaryCourts, populatedCourts, strongestChords } from './reading.js'
+import { angleContacts, crossChartActivations, decagonalNodeContacts, densestCluster, planetaryCourts, populatedCourts, strongestChords } from './reading.js'
 import { gateOccupancy, initiatoryWalk, officeBraid, silentGates } from './gates.js'
 import { chordTransmission, composeActivationTransmission, composeTransmission, finalSentence } from './synthesis.js'
 import { buildSynthesisPacket } from './synthesis-packet.js'
+import { defaultTimezone, isValidTimezone, searchCities, searchOfflineCities, supportedTimezones } from './cities.js'
 
 const COLORS = [
   '#748c83', '#7893a3', '#9a7892', '#a45743', '#c29854',
@@ -32,6 +33,7 @@ const state = {
   relatedAnchor: null,
   skyOpen: false,
   skyMode: null,
+  perspective: 'geocentric',
   skyTimestamp: null,
   skyPlacements: new Map(),
   majorPlacements: [],
@@ -71,6 +73,7 @@ app.innerHTML = `
         <span>Astral chamber</span><b>◫</b>
       </button>
       <button class="sky-button" data-sky-open aria-expanded="false"><span>Set the sky</span><b>☉</b></button>
+      <a class="phone-button" href="/phone" title="Open mobile Canvas view"><span>Phone</span><b>📱</b></a>
     </header>
 
     <section class="workbench">
@@ -110,6 +113,8 @@ app.innerHTML = `
   </main>
   <aside class="sky-drawer" data-sky-drawer aria-hidden="true">
     <div class="sky-drawer__header"><div><span>Ephemeris layer</span><h2>Set the sky</h2></div><button data-sky-close aria-label="Close sky controls">×</button></div>
+    <div class="perspective-switch" role="group" aria-label="Perspective center"><button class="is-active" data-perspective-select="geocentric">Geocentric · Earth</button><button data-perspective-select="heliocentric">Heliocentric · Sun</button></div>
+    <p class="perspective-descriptor" data-perspective-desc>Geocentric perspective · viewing the celestial wheel and Star Lineages from the Earth vessel.</p>
     <div class="sky-kind" role="group" aria-label="Chart kind"><button class="is-active" data-sky-kind="live">Live sky</button><button data-sky-kind="birth">Birth chart</button></div>
     <button class="reference-chart" data-reference-chart>Load Greenwich · J2000 reference</button>
     <form data-sky-form>
@@ -117,10 +122,23 @@ app.innerHTML = `
       <div class="birth-fields" data-birth-fields hidden>
         <fieldset class="entry-stage"><legend><b>02</b>Time confidence</legend><select name="confidence"><option value="exact">Exact · angles and houses included</option><option value="approximate">Approximate · angles marked provisional</option><option value="unknown">Unknown · angles and houses withheld</option></select><p>Choose the confidence of the recorded clock time, not the date.</p></fieldset>
         <fieldset class="entry-stage"><legend><b>03</b>Place and timezone</legend>
-          <label>Birthplace note <input name="place" autocomplete="off" placeholder="City, country · optional local note"></label>
-          <div class="coordinate-fields" data-coordinate-fields><label>Latitude<input name="latitude" type="number" min="-90" max="90" step="any" placeholder="43.6532"></label><label>Longitude<input name="longitude" type="number" min="-180" max="180" step="any" placeholder="-79.3832"></label></div>
-          <label>Confirmed timezone<input name="timezone" required placeholder="America/Toronto" autocomplete="off" aria-describedby="timezone-help"></label>
+          <div class="place-search-shell">
+            <label>City & birthplace
+              <input name="place" autocomplete="off" placeholder="Search city (e.g. Toronto, Paris, London, Tokyo)" aria-autocomplete="list" aria-controls="city-dropdown" aria-expanded="false">
+            </label>
+            <div class="city-dropdown" id="city-dropdown" data-city-dropdown hidden role="listbox" aria-label="City suggestions"></div>
+            <p class="place-resolved-badge" data-place-badge hidden></p>
+          </div>
+          <div class="coordinate-fields" data-coordinate-fields>
+            <label>Latitude<input name="latitude" type="number" min="-90" max="90" step="any" placeholder="43.6532"></label>
+            <label>Longitude<input name="longitude" type="number" min="-180" max="180" step="any" placeholder="-79.3832"></label>
+          </div>
+          <label>Confirmed timezone
+            <input name="timezone" required list="timezone-list" placeholder="America/Toronto" autocomplete="off" aria-describedby="timezone-help">
+          </label>
+          <datalist id="timezone-list" data-timezone-list></datalist>
           <p id="timezone-help">Use an IANA timezone such as America/Toronto. Coordinates and timezone are confirmed directly; the birthplace note remains on this device.</p>
+          <p class="timezone-validation-note" data-timezone-note></p>
         </fieldset>
       </div>
       <div class="sky-privacy"><i>◇</i><p><b>Transient by design</b>Nothing entered here is saved. The ephemeris service receives only the selected instant and canonical body identifiers.</p></div>
@@ -237,11 +255,27 @@ function skyLayer(selected) {
     const seat = nodePosition(selected)
     return `<path class="sky-bridge" d="M ${sky.x} ${sky.y} Q 410 410 ${seat.x} ${seat.y}" />`
   })() : ''
+  const isHelio = state.perspective === 'heliocentric'
+  const majorBodies = isHelio ? HELIOCENTRIC_MAJOR_BODIES : MAJOR_BODIES
   const planets = state.majorPlacements.map(placement => {
     const point = polar(370, -90 + placement.longitude)
-    const body = MAJOR_BODIES.find(candidate => candidate.command === placement.command)
-    return `<g class="planet-point"><circle cx="${point.x}" cy="${point.y}" r="7"/><text x="${point.x}" y="${point.y + 3}">${body?.symbol || '·'}</text><title>${body?.name || placement.name} · ${zodiacLabel(placement.longitude)}</title></g>`
+    const body = majorBodies.find(candidate => candidate.command === placement.command)
+    return `<g class="planet-point${placement.command === '399' ? ' planet-point--earth' : ''}"><circle cx="${point.x}" cy="${point.y}" r="7"/><text x="${point.x}" y="${point.y + 3}">${body?.symbol || '·'}</text><title>${body?.name || placement.name} · ${zodiacLabel(placement.longitude)}</title></g>`
   }).join('')
+  const decagonalNodesSvg = isHelio ? (() => {
+    return DECAGONAL_NODES.map(node => {
+      const outer = polar(402, -90 + node.angle)
+      const inner = polar(370, -90 + node.angle)
+      const nodeCircle = polar(386, -90 + node.angle)
+      const label = polar(418, -90 + node.angle)
+      return `<g class="decagonal-node-mark" data-node-index="${node.index}">
+        <line class="decagonal-node-ray" x1="${inner.x}" y1="${inner.y}" x2="${outer.x}" y2="${outer.y}" />
+        <circle class="decagonal-node-point" cx="${nodeCircle.x}" cy="${nodeCircle.y}" r="2.8" />
+        <text class="decagonal-node-label" x="${label.x}" y="${label.y}">${node.index}</text>
+        <title>Decagonal Node ${node.index} · ${node.angle}° (${node.sign} ${node.angle % 30}°) · Gate ${node.index}: ${escapeHtml(node.gate)} · Face ${node.face} (${escapeHtml(node.lineage)})</title>
+      </g>`
+    }).join('')
+  })() : ''
   const angles = state.chartAngles ? Object.entries({ ASC: state.chartAngles.ascendant, MC: state.chartAngles.midheaven, DSC: state.chartAngles.descendant, IC: state.chartAngles.imumCoeli }).map(([label, longitude]) => {
     const outer = polar(399, -90 + longitude)
     const inner = polar(375, -90 + longitude)
@@ -282,7 +316,7 @@ function skyLayer(selected) {
       const second = polar(370, -90 + state.skyHighlight.second.longitude)
       return `<path class="measured-chord measured-chord--${state.skyHighlight.aspect.toLowerCase()}" d="M ${first.x} ${first.y} Q 410 410 ${second.x} ${second.y}"/>`
     })() : ''
-  return `<g class="zodiac-register">${highlight}${ticks}${labels}${houses}${angles}</g>${comparison}<g class="sky-points">${points}${planets}${bridge}</g>`
+  return `<g class="zodiac-register">${highlight}${ticks}${labels}${houses}${angles}${decagonalNodesSvg}</g>${comparison}<g class="sky-points">${points}${planets}${bridge}</g>`
 }
 
 function renderMandala() {
@@ -360,16 +394,23 @@ function renderDetail() {
   const chords = chordDestinations(glyph, glyphByNumber)
   const relatedAnchor = glyphByNumber.get(state.relatedAnchor)
   const measured = state.skyPlacements.get(glyph.number)
+  const isHelio = state.perspective === 'heliocentric'
+  const majorBodies = isHelio ? HELIOCENTRIC_MAJOR_BODIES : MAJOR_BODIES
   const planetContacts = measured ? state.majorPlacements.flatMap(placement => {
     const contact = conjunction(measured.longitude, placement.longitude)
-    const body = MAJOR_BODIES.find(candidate => candidate.command === placement.command)
+    const body = majorBodies.find(candidate => candidate.command === placement.command)
     return contact ? [{ ...contact, body, placement }] : []
+  }) : []
+  const nodeContacts = (measured && isHelio) ? DECAGONAL_NODES.flatMap(node => {
+    const contact = conjunction(measured.longitude, node.angle)
+    return contact ? [{ ...contact, node }] : []
   }) : []
   const natalHouse = measured && state.houses ? houseForLongitude(measured.longitude, state.houses) : null
   const skyReading = measured ? `<section class="measured-sky">
-    <span>Measured sky · ${state.skyMode === 'birth' ? 'Natal field' : 'Live field'}</span>
+    <span>Measured sky · ${state.skyMode === 'birth' ? 'Natal field' : 'Live field'} · ${isHelio ? 'Heliocentric' : 'Geocentric'}</span>
     <p><b>${zodiacLabel(measured.longitude)}</b><small>${natalHouse ? `Whole Sign house ${natalHouse} · ` : ''}Latitude ${measured.latitude.toFixed(3)}° · NASA/JPL Horizons</small></p>
     ${planetContacts.length ? `<div>${planetContacts.map(contact => `<p><b>${contact.body.symbol} ${contact.body.name}</b><small>${contact.tier} conjunction · orb ${contact.orb.toFixed(3)}°</small></p>`).join('')}</div>` : '<em>No planetary conjunction within 3° · a measured silence</em>'}
+    ${nodeContacts.length ? `<div>${nodeContacts.map(c => `<p><b>Gate ${c.node.index} · ${escapeHtml(c.node.gate)}</b><small>Decagonal Node (${c.node.angle}°) · Face ${c.node.face} (${escapeHtml(c.node.lineage)}) · ${c.tier} orb ${c.orb.toFixed(3)}°</small></p>`).join('')}</div>` : ''}
   </section>` : ''
   const chamberPanel = state.chamber ? `
     <section class="chamber-panel" aria-label="Canonical relationships">
@@ -501,7 +542,134 @@ function toggleSkyDrawer(open = !state.skyOpen) {
   skyDrawer.classList.toggle('is-open', open)
   skyDrawer.setAttribute('aria-hidden', String(!open))
   document.querySelector('[data-sky-open]').setAttribute('aria-expanded', String(open))
-  if (open) skyDrawer.querySelector('input')?.focus()
+  if (open) {
+    if (skyDrawer.dataset.kind === 'birth') initBirthFields()
+    skyDrawer.querySelector('input')?.focus()
+  }
+}
+
+let citySearchController = null
+let activeCityResults = []
+let activeCityIndex = -1
+
+function initBirthFields() {
+  const form = document.querySelector('[data-sky-form]')
+  if (!form) return
+
+  const datalist = form.querySelector('[data-timezone-list]')
+  if (datalist && !datalist.children.length) {
+    datalist.innerHTML = supportedTimezones().map(tz => `<option value="${escapeHtml(tz)}"></option>`).join('')
+  }
+
+  if (!form.elements.timezone.value) {
+    form.elements.timezone.value = defaultTimezone()
+  }
+  updateTimezoneValidation(form.elements.timezone.value)
+}
+
+function updateTimezoneValidation(tz) {
+  const note = document.querySelector('[data-timezone-note]')
+  if (!note) return
+  const clean = (tz || '').trim()
+  if (!clean) {
+    note.textContent = 'Enter an IANA timezone (e.g. America/Toronto, Europe/Paris)'
+    note.className = 'timezone-validation-note is-warning'
+    return
+  }
+  if (isValidTimezone(clean)) {
+    try {
+      const timeStr = new Intl.DateTimeFormat('en-US', { timeZone: clean, hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }).format(new Date())
+      note.textContent = `✓ Confirmed IANA zone · current time ${timeStr}`
+      note.className = 'timezone-validation-note is-valid'
+    } catch {
+      note.textContent = '✓ Confirmed IANA timezone'
+      note.className = 'timezone-validation-note is-valid'
+    }
+  } else {
+    note.textContent = '⚠ Unrecognized IANA timezone name (e.g. America/Toronto, Europe/Paris, UTC)'
+    note.className = 'timezone-validation-note is-error'
+  }
+}
+
+function renderCityDropdown(cities) {
+  const dropdown = document.querySelector('[data-city-dropdown]')
+  const input = document.querySelector('[name="place"]')
+  if (!dropdown) return
+
+  activeCityResults = cities
+  activeCityIndex = -1
+
+  if (!cities.length) {
+    dropdown.hidden = true
+    input?.setAttribute('aria-expanded', 'false')
+    dropdown.innerHTML = ''
+    return
+  }
+
+  dropdown.innerHTML = cities.map((city, index) => {
+    const latStr = city.latitude >= 0 ? `${city.latitude.toFixed(2)}°N` : `${Math.abs(city.latitude).toFixed(2)}°S`
+    const lonStr = city.longitude >= 0 ? `${city.longitude.toFixed(2)}°E` : `${Math.abs(city.longitude).toFixed(2)}°W`
+    return `<button type="button" class="city-option" role="option" data-city-index="${index}">
+      <span class="city-option__title"><strong>${escapeHtml(city.name)}</strong><span>${escapeHtml([city.admin1, city.country].filter(Boolean).join(', '))}</span></span>
+      <span class="city-option__meta"><span>${latStr}, ${lonStr}</span><span>·</span><span>${escapeHtml(city.timezone)}</span></span>
+    </button>`
+  }).join('')
+
+  dropdown.hidden = false
+  input?.setAttribute('aria-expanded', 'true')
+
+  dropdown.querySelectorAll('.city-option').forEach(button => {
+    button.addEventListener('click', () => {
+      selectCity(activeCityResults[Number(button.dataset.cityIndex)])
+    })
+  })
+}
+
+function selectCity(city) {
+  if (!city) return
+  const form = document.querySelector('[data-sky-form]')
+  if (!form) return
+
+  form.elements.place.value = city.displayName
+  form.elements.latitude.value = city.latitude
+  form.elements.longitude.value = city.longitude
+  form.elements.timezone.value = city.timezone
+
+  updateTimezoneValidation(city.timezone)
+
+  const badge = document.querySelector('[data-place-badge]')
+  if (badge) {
+    badge.hidden = false
+    const latStr = city.latitude >= 0 ? `${city.latitude.toFixed(2)}°N` : `${Math.abs(city.latitude).toFixed(2)}°S`
+    const lonStr = city.longitude >= 0 ? `${city.longitude.toFixed(2)}°E` : `${Math.abs(city.longitude).toFixed(2)}°W`
+    badge.textContent = `✓ Set: ${city.displayName} (${latStr}, ${lonStr} · ${city.timezone})`
+  }
+
+  const dropdown = document.querySelector('[data-city-dropdown]')
+  if (dropdown) {
+    dropdown.hidden = true
+    dropdown.innerHTML = ''
+  }
+  form.elements.place.setAttribute('aria-expanded', 'false')
+}
+
+function setPerspective(perspective) {
+  state.perspective = perspective
+  skyDrawer.querySelectorAll('[data-perspective-select]').forEach(button => {
+    button.classList.toggle('is-active', button.dataset.perspectiveSelect === perspective)
+  })
+  const desc = skyDrawer.querySelector('[data-perspective-desc]')
+  if (desc) {
+    desc.textContent = perspective === 'heliocentric'
+      ? 'Heliocentric perspective · viewing from the Solar Center. Earth (⊕) orbits the Sun; angles yield to the 10 Decagonal Lineage Nodes.'
+      : 'Geocentric perspective · viewing the celestial wheel and Star Lineages from the Earth vessel.'
+  }
+  const coordFields = skyDrawer.querySelector('[data-coordinate-fields]')
+  if (coordFields) {
+    coordFields.classList.toggle('is-heliocentric', perspective === 'heliocentric')
+  }
+  renderMandala()
+  renderDetail()
 }
 
 function setSkyKind(kind) {
@@ -511,6 +679,7 @@ function setSkyKind(kind) {
   birthFields.querySelectorAll('input, select').forEach(input => { input.disabled = kind !== 'birth' })
   skyDrawer.dataset.kind = kind
   if (kind === 'live') skyDrawer.querySelector('[name="moment"]').value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+  if (kind === 'birth') initBirthFields()
   updateBirthConfidence()
 }
 
@@ -598,14 +767,18 @@ function renderComparisonPanel() {
 
 function renderReadingFolio() {
   const folio = document.querySelector('[data-reading-folio]')
-  const courts = planetaryCourts(glyphs, state.skyPlacements, state.majorPlacements, MAJOR_BODIES)
+  const isHelio = state.perspective === 'heliocentric'
+  const majorBodies = isHelio ? HELIOCENTRIC_MAJOR_BODIES : MAJOR_BODIES
+  const courts = planetaryCourts(glyphs, state.skyPlacements, state.majorPlacements, majorBodies)
   const populated = populatedCourts(courts)
-  const angles = angleContacts(glyphs, state.skyPlacements, state.chartAngles, state.angleConfidence)
+  const angles = !isHelio ? angleContacts(glyphs, state.skyPlacements, state.chartAngles, state.angleConfidence) : []
+  const nodeResults = isHelio ? decagonalNodeContacts(glyphs, state.skyPlacements, state.majorPlacements, DECAGONAL_NODES) : []
+  const populatedNodes = nodeResults.filter(item => item.contacts.length > 0)
   const silentCourts = courts.filter(court => !court.contacts.length && court.planet)
   const cluster = densestCluster(glyphs, state.skyPlacements)
   const uniqueGlyphPoints = [...new Map([...state.skyPlacements.values()].map(placement => [placement.command, { ...placement, id: placement.command, kind: 'glyph', label: placement.name }])).values()]
-  const planetPoints = state.majorPlacements.map(placement => ({ ...placement, id: `planet:${placement.command}`, kind: 'planet', label: MAJOR_BODIES.find(body => body.command === placement.command)?.name || placement.name }))
-  const anglePoints = state.chartAngles ? Object.entries({ Ascendant: state.chartAngles.ascendant, Midheaven: state.chartAngles.midheaven, Descendant: state.chartAngles.descendant, 'Imum Coeli': state.chartAngles.imumCoeli }).map(([label, longitude]) => ({ id: `angle:${label}`, kind: 'angle', label, longitude })) : []
+  const planetPoints = state.majorPlacements.map(placement => ({ ...placement, id: `planet:${placement.command}`, kind: 'planet', label: majorBodies.find(body => body.command === placement.command)?.name || placement.name }))
+  const anglePoints = (!isHelio && state.chartAngles) ? Object.entries({ Ascendant: state.chartAngles.ascendant, Midheaven: state.chartAngles.midheaven, Descendant: state.chartAngles.descendant, 'Imum Coeli': state.chartAngles.imumCoeli }).map(([label, longitude]) => ({ id: `angle:${label}`, kind: 'angle', label, longitude })) : []
   const chords = strongestChords([...uniqueGlyphPoints, ...planetPoints, ...anglePoints])
   const chordFamilies = ['Step', 'Gift', 'Vow', 'Spiral', 'Mirror']
   const gatePoints = [...planetPoints, ...anglePoints].map(point => ({ name: point.label, kind: point.kind, longitude: point.longitude }))
@@ -628,13 +801,27 @@ function renderReadingFolio() {
       themes: [contact.glyph.function],
       transmission: `Within ${court.body.name}'s court, ${contact.glyph.name} carries the office of ${contact.glyph.function.toLowerCase()}. Notice where this function is already moving through the life, and where it is still asking for form.`,
     }))),
-    ...angles.flatMap(angle => angle.contacts.map(contact => ({
+    ...(!isHelio ? angles.flatMap(angle => angle.contacts.map(contact => ({
       id: `angle:${angle.key}:${contact.glyph.number}`, kind: 'angle', tier: contact.tier, orb: contact.orb, confidence: angle.confidence,
       canonicalSeats: [contact.glyph.number],
       measurement: `${contact.glyph.name} conjunct ${angle.label} · orb ${contact.orb.toFixed(3)}° · ${angle.confidence}`,
       themes: [contact.glyph.function],
       transmission: `At the ${angle.label}, ${contact.glyph.name} approaches the threshold with its office of ${contact.glyph.function.toLowerCase()}. Receive this as an orientation, not an instruction.`,
-    }))),
+    }))) : []),
+    ...(isHelio ? populatedNodes.flatMap(item => item.contacts.map(contact => {
+      const contactLabel = contact.kind === 'planet' ? `${contact.symbol || ''} ${contact.name}` : contact.glyph.name
+      const theme = contact.kind === 'planet' ? `${contact.name} at Gate ${item.node.gate}` : contact.glyph.function
+      return {
+        id: `node:${item.node.index}:${contact.kind === 'planet' ? contact.placement.command : contact.glyph.number}`,
+        kind: 'node',
+        tier: contact.tier,
+        orb: contact.orb,
+        canonicalSeats: contact.kind === 'glyph' ? [contact.glyph.number] : [],
+        measurement: `${contactLabel} conjunct Decagonal Node ${item.node.index} (${item.node.gate} · ${item.node.lineage}) · orb ${contact.orb.toFixed(3)}°`,
+        themes: [theme],
+        transmission: `At Decagonal Gate ${item.node.index} (${item.node.gate}, Face ${item.node.face} of ${item.node.lineage}), ${contactLabel} aligns with the solar decagonal axis. Receive this alignment as a lineage root on the solar wheel.`,
+      }
+    })) : []),
     ...gates.filter(gate => !gate.silent).flatMap(gate => gate.contacts.filter(contact => contact.kind === 'glyph').map(contact => ({
       id: `gate:${gate.gate}:${contact.glyph.number}`, kind: 'gate', tier: contact.tier, orb: contact.orb,
       canonicalSeats: [contact.glyph.number],
@@ -657,16 +844,38 @@ function renderReadingFolio() {
   const isNatal = state.skyMode === 'birth'
   folio.dataset.depth = 'essential'
   folio.innerHTML = `<nav class="folio-depth" aria-label="Reading depth"><button type="button" class="is-active" data-folio-depth="essential">Essential</button><button type="button" data-folio-depth="full">Full folio</button><button type="button" data-folio-depth="technical">Technical</button></nav>
-    <header><span>${isNatal ? 'Natal' : 'Live'} result folio</span><h3 tabindex="-1">Measured correspondences</h3><p>Measurement and canonical interpretation remain separate registers.</p></header>
-    <nav class="folio-index" aria-label="Folio sections"><button type="button" data-folio-jump="courts">Courts</button><button type="button" data-folio-jump="angles">Angles</button><button type="button" data-folio-jump="cluster">Cluster</button><button type="button" data-folio-jump="gates">Gates</button><button type="button" data-folio-jump="chords">Chords</button><button type="button" data-folio-jump="synthesis">Synthesis</button></nav>
+    <header><span>${isNatal ? 'Natal' : 'Live'} · ${isHelio ? 'Heliocentric' : 'Geocentric'} result folio</span><h3 tabindex="-1">Measured correspondences</h3><p>Measurement and canonical interpretation remain separate registers.</p></header>
+    <nav class="folio-index" aria-label="Folio sections"><button type="button" data-folio-jump="courts">Courts</button><button type="button" data-folio-jump="${isHelio ? 'nodes' : 'angles'}">${isHelio ? 'Nodes' : 'Angles'}</button><button type="button" data-folio-jump="cluster">Cluster</button><button type="button" data-folio-jump="gates">Gates</button><button type="button" data-folio-jump="chords">Chords</button><button type="button" data-folio-jump="synthesis">Synthesis</button></nav>
     <section class="essential-record"><div class="folio-heading"><span>✦</span><h4>Strongest evidence</h4><small>${synthesis.evidence.length} threads</small></div>${synthesis.evidence.map(item => `<p><b>${item.kind}</b><span>${escapeHtml(item.measurement)}</span></p>`).join('')}</section>
     <section class="folio-full" id="folio-courts"><div class="folio-heading"><span>01</span><h4>Planetary courts</h4><small>${populated.length} populated</small></div>
       ${populated.length ? populated.map(court => `<article><h5>${court.body.symbol} ${court.body.name}'s Court <small>${zodiacLabel(court.planet.longitude)}</small></h5>${contactRows(court.contacts)}</article>`).join('') : '<p class="folio-silence">No glyph lies within the declared 3° conjunction range of a planetary point.</p>'}
       ${silentCourts.length ? `<p class="folio-silence"><b>Silent courts</b> ${silentCourts.map(court => court.body.name).join(' · ')}</p>` : ''}
     </section>
+    ${isHelio ? `
+    <section class="folio-full" id="folio-nodes"><div class="folio-heading"><span>02</span><h4>The 10 Decagonal Nodes</h4><small>${populatedNodes.length} active</small></div>
+      ${nodeResults.map(item => `
+        <article class="node-record">
+          <h5>Node ${item.node.index} · ${escapeHtml(item.node.gate)} <small>${item.node.sign} ${item.node.angle % 30}° (${item.node.angle}°) · Face ${item.node.face} (${escapeHtml(item.node.lineage)})</small></h5>
+          ${item.contacts.length ? `<div class="node-contacts">${item.contacts.map(c => {
+            if (c.kind === 'planet') {
+              return `<div class="node-contact-item">
+                <span><b>${escapeHtml(c.symbol || '')} ${escapeHtml(c.name)}</b> <small>${zodiacLabel(c.placement.longitude)} · orb ${c.orb.toFixed(3)}° · ${c.tier}</small></span>
+                <em>Planetary conjunction to Node ${item.node.index} (${escapeHtml(item.node.gate)})</em>
+              </div>`
+            }
+            return `<button data-folio-seat="${c.glyph.number}">
+              <span><b>${String(c.glyph.number).padStart(3, '0')} · ${escapeHtml(c.glyph.name)}</b><small>${zodiacLabel(c.placement.longitude)} · orb ${c.orb.toFixed(3)}° · ${c.tier}</small></span>
+              <em>${escapeHtml(c.glyph.function)}</em>
+            </button>`
+          }).join('')}</div>` : '<p class="folio-silence">No planetary body or glyph within 3° · measured silence</p>'}
+        </article>
+      `).join('')}
+    </section>
+    ` : `
     <section class="folio-full" id="folio-angles"><div class="folio-heading"><span>02</span><h4>The four angles</h4><small>${angles.length ? state.angleConfidence : 'unavailable'}</small></div>
       ${angles.length ? angles.map(angle => `<article class="angle-record${angle.confidence === 'approximate' ? ' is-approximate' : ''}"><h5>${angle.label} <small>${zodiacLabel(angle.longitude)} · ${angle.confidence}</small></h5>${angle.contacts.length ? contactRows(angle.contacts) : '<p class="folio-silence">No glyph within 3° · measured silence</p>'}</article>`).join('') : `<p class="folio-silence">${isNatal ? 'Birth time unknown: angle claims are suppressed.' : 'Angles belong to a located chart and are not inferred for the geocentric live field.'}</p>`}
     </section>
+    `}
     <section class="folio-full" id="folio-cluster"><div class="folio-heading"><span>03</span><h4>The densest gathering</h4><small>${cluster?.members.length || 0} bodies</small></div>
       ${cluster ? `<article class="cluster-record"><h5>${zodiacLabel(cluster.center)} <small>${cluster.span.toFixed(3)}° span · ${cluster.countingRule}</small></h5><p>${cluster.members.map(member => escapeHtml(member.name)).join(' · ')}</p><p class="cluster-seats">Canonical seats ${cluster.seats.map(seat => String(seat).padStart(3, '0')).join(' · ')}</p><button type="button" class="folio-reveal" data-reveal-cluster>Reveal gathering on wheel <span>↗</span></button></article>` : '<p class="folio-silence">No measured glyph field available.</p>'}
     </section>
@@ -756,9 +965,9 @@ function renderReadingFolio() {
     URL.revokeObjectURL(url)
   })
   folio.querySelector('[data-export-record]').addEventListener('click', () => {
-    const record = technicalRecord({ timestamp: state.skyTimestamp, mode: state.skyMode, placements: state.skyPlacements, planets: state.majorPlacements, angles: state.chartAngles, houses: state.houses, angleConfidence: state.angleConfidence })
+    const record = technicalRecord({ timestamp: state.skyTimestamp, mode: state.skyMode, center: state.perspective, placements: state.skyPlacements, planets: state.majorPlacements, angles: state.chartAngles, houses: state.houses, angleConfidence: state.angleConfidence })
     const url = URL.createObjectURL(new Blob([JSON.stringify(record, null, 2)], { type: 'application/json' }))
-    const anchor = Object.assign(document.createElement('a'), { href: url, download: `celestial-glyphs-${state.skyTimestamp.slice(0, 10)}.json` })
+    const anchor = Object.assign(document.createElement('a'), { href: url, download: `celestial-glyphs-${state.perspective}-${state.skyTimestamp.slice(0, 10)}.json` })
     anchor.click()
     URL.revokeObjectURL(url)
   })
@@ -766,9 +975,12 @@ function renderReadingFolio() {
 
 async function calculateSky(event) {
   event.preventDefault()
-  const form = new FormData(event.currentTarget)
+  const formElement = event.currentTarget
+  const submitButton = formElement?.querySelector('button[type="submit"]')
+  const form = new FormData(formElement)
   const kind = skyDrawer.dataset.kind || 'live'
   const confidence = form.get('confidence')
+  const isHelio = state.perspective === 'heliocentric'
   let moment
   let angles = null
   let houses = null
@@ -776,7 +988,7 @@ async function calculateSky(event) {
     if (kind === 'birth') {
       const localMoment = confidence === 'unknown' ? `${String(form.get('moment')).slice(0, 10)}T12:00` : form.get('moment')
       moment = zonedDateTime(localMoment, String(form.get('timezone')).trim())
-      if (confidence !== 'unknown') {
+      if (!isHelio && confidence !== 'unknown') {
         if (form.get('latitude') === '' || form.get('longitude') === '') throw new Error('Confirmed coordinates are required for chart angles.')
         angles = chartAngles(moment, Number(form.get('latitude')), Number(form.get('longitude')))
         houses = wholeSignHouses(angles.ascendant)
@@ -791,22 +1003,26 @@ async function calculateSky(event) {
     return
   }
   const status = document.querySelector('[data-sky-status]')
-  status.textContent = 'Opening the ephemeris · 96 glyph bodies + 10 planetary points'
-  event.currentTarget.querySelector('button[type="submit"]').disabled = true
+  const majorBodies = isHelio ? HELIOCENTRIC_MAJOR_BODIES : MAJOR_BODIES
+  status.textContent = `Opening the ephemeris · 96 glyph bodies + ${majorBodies.length} planetary points (${isHelio ? 'heliocentric' : 'geocentric'})`
+  if (submitButton) submitButton.disabled = true
   const progress = document.querySelector('[data-calculation-progress]')
   progress.hidden = false
   state.skyController?.abort()
   state.skyController = new AbortController()
   try {
-    const bodies = [...uniqueMeasuredBodies(glyphs), ...MAJOR_BODIES]
+    const bodies = [...uniqueMeasuredBodies(glyphs), ...majorBodies]
     state.chartAngles = angles
     state.houses = houses
-    state.angleConfidence = kind === 'birth' ? confidence : null
+    state.angleConfidence = isHelio ? null : (kind === 'birth' ? confidence : null)
     const result = await fetchEphemerisInBatches({
-      timestamp: moment.toISOString(), bodies, signal: state.skyController.signal,
+      timestamp: moment.toISOString(),
+      bodies,
+      center: state.perspective,
+      signal: state.skyController.signal,
       onProgress: partial => {
         state.skyPlacements = placementsBySeat(partial.placements, glyphs)
-        state.majorPlacements = partial.placements.filter(placement => MAJOR_BODIES.some(body => body.command === placement.command))
+        state.majorPlacements = partial.placements.filter(placement => majorBodies.some(body => body.command === placement.command))
         document.querySelector('[data-progress-count]').textContent = `${partial.completed} / ${partial.total}`
         document.querySelector('[data-progress-bar]').style.width = `${partial.completed / partial.total * 100}%`
         status.textContent = `Receiving the ephemeris · ${partial.completed} of ${partial.total} bodies · partial field visible`
@@ -814,11 +1030,13 @@ async function calculateSky(event) {
       },
     })
     state.skyPlacements = placementsBySeat(result.placements, glyphs)
-    state.majorPlacements = result.placements.filter(placement => MAJOR_BODIES.some(body => body.command === placement.command))
+    state.majorPlacements = result.placements.filter(placement => majorBodies.some(body => body.command === placement.command))
     state.skyTimestamp = result.timestamp
     state.skyMode = kind
     state.skyHighlight = null
-    const angleStatus = kind === 'birth' ? (angles ? ` · Whole Sign houses · angles ${confidence}` : ' · houses and angles suppressed') : ''
+    const angleStatus = isHelio
+      ? ' · solar observer (500@10) · 10 Decagonal Nodes active'
+      : (kind === 'birth' ? (angles ? ` · Whole Sign houses · angles ${confidence}` : ' · houses and angles suppressed') : '')
     status.textContent = `${state.skyPlacements.size} seats + ${state.majorPlacements.length} planets measured${angleStatus} · NASA/JPL Horizons`
     if (kind === 'birth') {
       state.natalField = {
@@ -850,7 +1068,7 @@ async function calculateSky(event) {
   } catch (error) {
     status.textContent = error.name === 'AbortError' ? 'Calculation cancelled · received placements remain visible and cached' : error.message
   } finally {
-    event.currentTarget.querySelector('button[type="submit"]').disabled = false
+    if (submitButton) submitButton.disabled = false
     progress.hidden = true
     state.skyController = null
   }
@@ -866,6 +1084,7 @@ document.querySelectorAll('[data-mode]').forEach(button => button.addEventListen
 document.querySelector('[data-chamber]').addEventListener('click', toggleChamber)
 document.querySelector('[data-sky-open]').addEventListener('click', () => toggleSkyDrawer())
 document.querySelector('[data-sky-close]').addEventListener('click', () => toggleSkyDrawer(false))
+skyDrawer.querySelectorAll('[data-perspective-select]').forEach(button => button.addEventListener('click', () => setPerspective(button.dataset.perspectiveSelect)))
 document.querySelectorAll('[data-sky-kind]').forEach(button => button.addEventListener('click', () => setSkyKind(button.dataset.skyKind)))
 document.querySelector('[name="confidence"]').addEventListener('change', updateBirthConfidence)
 document.querySelector('[data-sky-form]').addEventListener('submit', calculateSky)
@@ -879,8 +1098,95 @@ document.querySelector('[data-reference-chart]').addEventListener('click', () =>
   form.elements.latitude.value = '0'
   form.elements.longitude.value = '0'
   form.elements.timezone.value = 'UTC'
+  updateTimezoneValidation('UTC')
+  const badge = document.querySelector('[data-place-badge]')
+  if (badge) {
+    badge.hidden = false
+    badge.textContent = '✓ Reference: Greenwich (0.00°N, 0.00°E · UTC)'
+  }
   document.querySelector('[data-sky-status]').textContent = 'Synthetic public reference loaded · submit when ready'
 })
+
+const placeInput = document.querySelector('[name="place"]')
+let placeDebounce = null
+
+placeInput?.addEventListener('input', () => {
+  const query = placeInput.value.trim()
+  clearTimeout(placeDebounce)
+
+  if (citySearchController) {
+    citySearchController.abort()
+    citySearchController = null
+  }
+
+  if (query.length < 2) {
+    renderCityDropdown([])
+    return
+  }
+
+  // Instant offline matches first so dropdown appears immediately
+  const offline = searchOfflineCities(query, 6)
+  if (offline.length) {
+    renderCityDropdown(offline)
+  }
+
+  placeDebounce = setTimeout(async () => {
+    citySearchController = new AbortController()
+    try {
+      const results = await searchCities(query, { signal: citySearchController.signal })
+      renderCityDropdown(results)
+    } catch (err) {
+      if (err.name !== 'AbortError') console.error('City search failed:', err)
+    } finally {
+      citySearchController = null
+    }
+  }, 180)
+})
+
+placeInput?.addEventListener('keydown', event => {
+  const dropdown = document.querySelector('[data-city-dropdown]')
+  if (!dropdown || dropdown.hidden || !activeCityResults.length) return
+
+  const options = dropdown.querySelectorAll('.city-option')
+
+  if (event.key === 'ArrowDown') {
+    event.preventDefault()
+    activeCityIndex = (activeCityIndex + 1) % options.length
+    options.forEach((opt, idx) => opt.classList.toggle('is-focused', idx === activeCityIndex))
+    options[activeCityIndex]?.scrollIntoView({ block: 'nearest' })
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault()
+    activeCityIndex = (activeCityIndex - 1 + options.length) % options.length
+    options.forEach((opt, idx) => opt.classList.toggle('is-focused', idx === activeCityIndex))
+    options[activeCityIndex]?.scrollIntoView({ block: 'nearest' })
+  } else if (event.key === 'Enter') {
+    if (activeCityIndex >= 0 && activeCityIndex < activeCityResults.length) {
+      event.preventDefault()
+      selectCity(activeCityResults[activeCityIndex])
+    }
+  } else if (event.key === 'Escape') {
+    dropdown.hidden = true
+    placeInput.setAttribute('aria-expanded', 'false')
+  }
+})
+
+document.addEventListener('click', event => {
+  const shell = document.querySelector('.place-search-shell')
+  const dropdown = document.querySelector('[data-city-dropdown]')
+  if (dropdown && !dropdown.hidden && shell && !shell.contains(event.target)) {
+    dropdown.hidden = true
+    placeInput?.setAttribute('aria-expanded', 'false')
+  }
+})
+
+const timezoneInput = document.querySelector('[name="timezone"]')
+timezoneInput?.addEventListener('input', () => {
+  updateTimezoneValidation(timezoneInput.value)
+})
+timezoneInput?.addEventListener('change', () => {
+  updateTimezoneValidation(timezoneInput.value)
+})
+
 setSkyKind('live')
 
 document.querySelector('#glyph-search').addEventListener('input', event => {

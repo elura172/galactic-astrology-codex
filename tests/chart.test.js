@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { chartAngles, houseForLongitude, lineageHouseResonance, MAJOR_BODIES, wholeSignHouses, zonedDateTime } from '../src/chart.js'
+import { chartAngles, DECAGONAL_NODES, HELIOCENTRIC_MAJOR_BODIES, houseForLongitude, lineageHouseResonance, MAJOR_BODIES, wholeSignHouses, zonedDateTime } from '../src/chart.js'
 
 test('resolves a confirmed IANA timezone at the historical instant', () => {
   assert.equal(zonedDateTime('2000-01-01T07:00', 'America/Toronto').toISOString(), '2000-01-01T12:00:00.000Z')
@@ -38,3 +38,23 @@ test('keeps lineage face and natal house as separate resonance dimensions', () =
     { house: 2, groupIndex: 1, seats: [10] },
   ])
 })
+
+test('declares the heliocentric major bodies with Earth as primary inner body', () => {
+  assert.equal(HELIOCENTRIC_MAJOR_BODIES.length, 9)
+  assert.equal(HELIOCENTRIC_MAJOR_BODIES[0].command, '399')
+  assert.equal(HELIOCENTRIC_MAJOR_BODIES[0].name, 'Earth')
+  assert.equal(HELIOCENTRIC_MAJOR_BODIES[0].symbol, '⊕')
+  assert.ok(!HELIOCENTRIC_MAJOR_BODIES.some(body => body.name === 'Sun' || body.name === 'Moon'))
+})
+
+test('declares the 10 decagonal nodes at 36-degree intervals aligned to canonical lineage gates', () => {
+  assert.equal(DECAGONAL_NODES.length, 10)
+  assert.deepEqual(DECAGONAL_NODES.map(n => n.angle), [0, 36, 72, 108, 144, 180, 216, 252, 288, 324])
+  assert.equal(DECAGONAL_NODES[0].gate, 'Vow Crown')
+  assert.equal(DECAGONAL_NODES[0].lineage, 'Vega')
+  assert.equal(DECAGONAL_NODES[5].gate, 'Codex Mirror')
+  assert.equal(DECAGONAL_NODES[5].lineage, 'Sirius')
+  assert.equal(DECAGONAL_NODES[9].gate, 'Earth Grid')
+  assert.equal(DECAGONAL_NODES[9].lineage, 'Pleiades')
+})
+

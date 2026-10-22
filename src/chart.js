@@ -13,6 +13,31 @@ export const MAJOR_BODIES = [
   { command: '999', name: 'Pluto', symbol: '♇' },
 ]
 
+export const HELIOCENTRIC_MAJOR_BODIES = [
+  { command: '399', name: 'Earth', symbol: '⊕' },
+  { command: '199', name: 'Mercury', symbol: '☿' },
+  { command: '299', name: 'Venus', symbol: '♀' },
+  { command: '499', name: 'Mars', symbol: '♂' },
+  { command: '599', name: 'Jupiter', symbol: '♃' },
+  { command: '699', name: 'Saturn', symbol: '♄' },
+  { command: '799', name: 'Uranus', symbol: '♅' },
+  { command: '899', name: 'Neptune', symbol: '♆' },
+  { command: '999', name: 'Pluto', symbol: '♇' },
+]
+
+export const DECAGONAL_NODES = [
+  { index: 1, angle: 0, sign: 'ARI', gate: 'Vow Crown', face: 'I', lineage: 'Vega', groupIndex: 0 },
+  { index: 2, angle: 36, sign: 'TAU', gate: 'Signal Path', face: 'II', lineage: 'Lyra', groupIndex: 1 },
+  { index: 3, angle: 72, sign: 'GEM', gate: 'Dream Circuit', face: 'III', lineage: 'Arcturus', groupIndex: 2 },
+  { index: 4, angle: 108, sign: 'CAN', gate: 'Flame Gate', face: 'IV', lineage: 'Orion', groupIndex: 3 },
+  { index: 5, angle: 144, sign: 'LEO', gate: 'Mirror-Bond', face: 'V', lineage: 'Aldebaran', groupIndex: 4 },
+  { index: 6, angle: 180, sign: 'LIB', gate: 'Codex Mirror', face: 'VI', lineage: 'Sirius', groupIndex: 5 },
+  { index: 7, angle: 216, sign: 'SCO', gate: 'Threshold Warden', face: 'VII', lineage: 'Antares', groupIndex: 6 },
+  { index: 8, angle: 252, sign: 'SAG', gate: 'Bio-Architect', face: 'VIII', lineage: 'Andromeda', groupIndex: 7 },
+  { index: 9, angle: 288, sign: 'CAP', gate: 'Heart Beacon', face: 'IX', lineage: 'Alpha Centauri', groupIndex: 8 },
+  { index: 10, angle: 324, sign: 'AQU', gate: 'Earth Grid', face: 'X', lineage: 'Pleiades', groupIndex: 9 },
+]
+
 function partsAt(date, timeZone) {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
