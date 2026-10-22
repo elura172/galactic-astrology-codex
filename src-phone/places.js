@@ -322,6 +322,34 @@ PLACES.forEach(place => {
   }
 })
 
+// Integrate the expanded offline world cities register if available
+if (typeof MAJOR_CITIES !== 'undefined' && Array.isArray(MAJOR_CITIES)) {
+  MAJOR_CITIES.forEach(city => {
+    const existing = INDEX.get(fold(city.name))
+    const alreadyKnown = existing && existing.some(p => fold(p.country) === fold(city.country))
+    if (!alreadyKnown) {
+      const place = {
+        city: city.name,
+        admin: city.admin1 || '',
+        country: city.country || '',
+        latitude: city.latitude,
+        longitude: city.longitude,
+        timeZone: city.timezone || 'UTC',
+        label: [city.name, city.admin1, city.country].filter(Boolean).join(', '),
+      }
+      PLACES.push(place)
+      index(place.city, place)
+      index(`${place.city} ${place.country}`, place)
+      index(`${place.city}, ${place.country}`, place)
+      if (place.admin) {
+        index(`${place.city} ${place.admin}`, place)
+        index(`${place.city}, ${place.admin}`, place)
+        index(`${place.city}, ${place.admin}, ${place.country}`, place)
+      }
+    }
+  })
+}
+
 const COORDINATE_PAIR = /^\s*(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)\s*$/
 
 /**
@@ -356,6 +384,35 @@ export function resolveBirthplace(input) {
     }
     return { ambiguous: matches.map(place => ({ ...place })) }
   }
+  return null
+}
+
+/**
+ * Asynchronously resolve a birthplace with Open-Meteo fallback when offline match is missing.
+ */
+export async function resolveBirthplaceAsync(input, options = {}) {
+  const syncMatch = resolveBirthplace(input)
+  if (syncMatch) return syncMatch
+
+  if (typeof searchCities === 'function') {
+    try {
+      const results = await searchCities(input, options)
+      if (results && results.length > 0) {
+        const top = results[0]
+        return {
+          city: top.name,
+          admin: top.admin1 || '',
+          country: top.country || '',
+          latitude: top.latitude,
+          longitude: top.longitude,
+          timeZone: top.timezone || 'UTC',
+          label: top.displayName || [top.name, top.admin1, top.country].filter(Boolean).join(', '),
+          source: 'remote-geocoding',
+        }
+      }
+    } catch {}
+  }
+
   return null
 }
 

@@ -875,6 +875,16 @@ a:hover { color:#0A0E15; }
           <input type="time" value="{{ birthTime }}" sc-camel-on-change="{{ setBirthTime }}" style="background:transparent; border:0; border-bottom:1px solid rgba(10,14,21,0.22); font-family:'Spectral',serif; font-size:16px; color:#0A0E15; padding:10px 0; outline:none;">
           <p style="margin:6px 0 0; font-size:11px; line-height:1.5; font-style:italic; color:#7A7466;">Leave empty if unknown — noon is then assumed, and the angles should not be trusted.</p>
         </div>
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <div style="font-family:'Cormorant Garamond',serif; font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:#7A7466;">Birthplace</div>
+          <input type="text" value="{{ birthPlace }}" sc-camel-on-change="{{ setBirthPlace }}" placeholder="City name (e.g. Kyoto, Japan or Toronto)" style="background:transparent; border:0; border-bottom:1px solid rgba(10,14,21,0.22); font-family:'Spectral',serif; font-size:16px; color:#0A0E15; padding:10px 0; outline:none;">
+          <sc-if value="{{ birthPlaceResolved }}">
+            <p style="margin:6px 0 0; font-size:11px; line-height:1.5; color:#B98438;">📍 {{ birthPlaceResolved }}</p>
+          </sc-if>
+          <sc-if value="{{ noBirthPlaceResolved }}">
+            <p style="margin:6px 0 0; font-size:11px; line-height:1.5; font-style:italic; color:#7A7466;">Used to calculate the Four Angles and local whole-sign houses.</p>
+          </sc-if>
+        </div>
         <div sc-camel-on-click="{{ beginReading }}" style="margin-top:16px; align-self:flex-start; display:inline-flex; align-items:center; font-family:'Cormorant Garamond',serif; font-size:12px; letter-spacing:0.18em; text-transform:uppercase; font-weight:500; border:1px solid #B98438; color:#B98438; border-radius:1px; padding:14px 28px; cursor:pointer; min-height:44px;" style-hover="background:#B98438; color:#F1E8D6;">{{ beginLabel }}</div>
         <sc-if value="{{ formNotice }}">
           <p style="margin:0; font-size:12px; line-height:1.7; color:#B98438; max-width:44ch;">{{ formNotice }}</p>
@@ -983,6 +993,24 @@ a:hover { color:#0A0E15; }
           </sc-for>
         </div>
 
+        <sc-if value="{{ hasDemoNodes }}">
+        <div style="margin-top:40px; display:flex; align-items:baseline; justify-content:space-between;">
+          <div style="font-family:'Cormorant Garamond',serif; font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:#7A7466;">The 10 Decagonal Nodes</div>
+          <div style="font-size:11px; color:#7A7466;">Solar lineage gates</div>
+        </div>
+        <div style="margin-top:8px; border-top:1px solid rgba(10,14,21,0.10); display:flex; flex-direction:column;">
+          <sc-for list="{{ demoNodes }}" as="dn" hint-placeholder-count="3">
+            <div style="padding:15px 0; border-bottom:1px solid rgba(10,14,21,0.10);">
+              <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px;">
+                <div style="font-family:'Cormorant Garamond',serif; font-size:16px;">Node {{ dn.index }} · {{ dn.gate }}</div>
+                <div style="font-size:11px; color:#7A7466;">{{ dn.sign }} {{ dn.deg }} · {{ dn.lineage }}</div>
+              </div>
+              <div style="margin-top:4px; font-size:12px; font-style:italic; color:#7A7466;">{{ dn.summary }}</div>
+            </div>
+          </sc-for>
+        </div>
+        </sc-if>
+
         <sc-if value="{{ demoCluster }}">
         <div style="margin-top:48px; display:flex; align-items:baseline; justify-content:space-between;">
           <div style="font-family:'Cormorant Garamond',serif; font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:#7A7466;">The Densest Cluster</div>
@@ -1027,7 +1055,7 @@ a:hover { color:#0A0E15; }
 </x-dc>
 <script type="text/x-dc" data-dc-script="" data-props="{&quot;ephemerisEndpoint&quot;: {&quot;editor&quot;: &quot;text&quot;, &quot;default&quot;: &quot;/api/ephemeris&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Reading&quot;}}">
 class Component extends DCLogic {
-  state = { tab: 'wheel', ringIndex: null, seat: null, lineage: null, begun: false, glyphs: [], lineages: [], formNotice: '', threshold: !localStorage.getItem('glcx_threshold_crossed') };
+  state = { tab: 'wheel', ringIndex: null, seat: null, lineage: null, begun: false, glyphs: [], lineages: [], birthPlace: '', birthPlaceResolved: null, formNotice: '', threshold: !localStorage.getItem('glcx_threshold_crossed') };
 
   async componentDidMount() {
     const mod = await import(window.__resources ? window.__resources.codexData : './codex-data.js');
@@ -1090,10 +1118,20 @@ class Component extends DCLogic {
     // same breath — cleared early, a failure below would leave the button live
     // and the reading absent, which reads as the press having done nothing.
     try {
-      const reading = this.mod.computeReading(glyphs, lonByName, natal, live, { instant });
+      let resolvedPlace = null;
+      if (this.state.birthPlace) {
+        try {
+          resolvedPlace = await (this.mod.resolveBirthplaceAsync ? this.mod.resolveBirthplaceAsync(this.state.birthPlace) : this.mod.resolveBirthplace(this.state.birthPlace));
+        } catch {}
+      }
+      const reading = this.mod.computeReading(glyphs, lonByName, natal, live, {
+        instant,
+        birthplace: resolvedPlace ? resolvedPlace.label : this.state.birthPlace,
+      });
       const note = 'Drawn from the Sun. Instant: ' + instant.replace('T', ' ').replace(':00.000Z', ' UT')
         + '. Planets: heliocentric, Keplerian, \u00B1arcminutes. Glyph bodies: ' + glyphSource
         + '. Present field: computed for now.'
+        + (resolvedPlace ? ' Birthplace: ' + resolvedPlace.label + '.' : '')
         + ' The four angles are Earth\u2019s and do not appear in a Sun-centred chart.';
       this.setState({ begun: true, reading, readingNote: note, ephProgress: '' });
     } catch (fatal) {
@@ -1113,6 +1151,19 @@ class Component extends DCLogic {
         .map(c => c.glyph.name + (c.glyph.seam ? ' (seam)' : '') + ' \u00B7 ' + deg(c.orb)).join('  \u2014  ');
     };
     return {
+      demoNodes: (d.populatedNodes || []).map(item => {
+        const top = item.contacts[0];
+        const label = top.kind === 'planet' ? (top.name || '') : (top.glyph ? top.glyph.name : '');
+        return {
+          index: item.node.index,
+          gate: item.node.gate,
+          lineage: item.node.lineage,
+          sign: item.node.sign,
+          deg: (item.node.angle % 30) + '\u00B0',
+          summary: label ? `${label} conjunct (${deg(top.orb)} \u00B7 ${top.tier})` : 'Measured silence',
+        };
+      }),
+      hasDemoNodes: (d.populatedNodes || []).length > 0,
       demoActivations: d.activations.map(a => ({ planet: a.planet, name: a.glyph.name, orb: deg(a.orb), tier: a.tier, mirror: a.glyph.mirror })),
       demoConjunctions: d.conjunctions.map(c => ({ name: c.glyph.name, cat: c.glyph.catalogue.match(/\((\d+)\)/) ? '(' + c.glyph.catalogue.match(/\((\d+)\)/)[1] + ')' : '', planet: c.planet, orb: deg(c.orb), tier: c.tier, open: openSeat(c.glyph.number) })),
       demoCourts: d.courts.map(ct => ({ planet: ct.planet, count: ct.contacts.length, members: seatNames(ct.contacts) })),
@@ -1247,8 +1298,20 @@ class Component extends DCLogic {
       resetReading: () => this.setState({ begun: false, reading: null }),
       birthDate: this.state.birthDate || '',
       birthTime: this.state.birthTime || '',
+      birthPlace: this.state.birthPlace || '',
+      birthPlaceResolved: this.state.birthPlaceResolved ? this.state.birthPlaceResolved.label : '',
+      noBirthPlaceResolved: !this.state.birthPlaceResolved,
       setBirthDate: (e) => this.setState({ birthDate: e.target.value }),
       setBirthTime: (e) => this.setState({ birthTime: e.target.value }),
+      setBirthPlace: async (e) => {
+        const val = e.target.value;
+        this.setState({ birthPlace: val });
+        if (this.mod && this.mod.resolveBirthplaceAsync) {
+          const res = await this.mod.resolveBirthplaceAsync(val);
+          if (res && !res.ambiguous) this.setState({ birthPlaceResolved: res });
+          else this.setState({ birthPlaceResolved: null });
+        }
+      },
       formNotice: this.state.formNotice || '',
       readingLayers: [
         { n: 'i', name: 'The Exact Conjunctions', desc: 'Glyphs conjunct heliocentric planets at the tightest measured orbs.' },

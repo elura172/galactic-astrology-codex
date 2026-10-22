@@ -137,6 +137,28 @@ function angleEvidence(angles, confidence) {
   })
 }
 
+function nodeEvidence(nodeResults) {
+  if (!Array.isArray(nodeResults)) return []
+  return nodeResults
+    .filter(item => item.contacts && item.contacts.length)
+    .slice(0, 3)
+    .flatMap(item => {
+      const tightest = item.contacts[0]
+      const contactLabel = tightest.kind === 'planet' ? `${tightest.symbol || ''} ${tightest.name}`.trim() : (tightest.glyph?.name || 'A glyph')
+      const theme = tightest.kind === 'planet' ? `${tightest.name} at Gate ${item.node.gate}` : themeOf(tightest.glyph)
+      return [{
+        id: `node-${item.node.index}`,
+        kind: 'node',
+        tier: tightest.tier,
+        orb: tightest.orb,
+        canonicalSeats: tightest.kind === 'glyph' && tightest.glyph ? [tightest.glyph.number] : [],
+        measurement: `${contactLabel} conjunct Decagonal Node ${item.node.index} (${item.node.gate} · ${item.node.lineage}) at ${tightest.orb.toFixed(3)}°`,
+        themes: [theme].filter(Boolean),
+        transmission: `At Decagonal Gate ${item.node.index} (${item.node.gate}, Face ${item.node.face} of ${item.node.lineage}), ${contactLabel} aligns with the solar decagonal axis. Receive this alignment as a lineage root on the solar wheel.`,
+      }]
+    })
+}
+
 function chordEvidence(chords) {
   return chords.slice(0, 3).map(chord => ({
     id: `chord-${chord.name}-${chord.first}-${chord.second}`.replace(/\s+/g, '-').toLowerCase(),
@@ -323,10 +345,17 @@ export function computeReading(glyphs, source, natal, live, options = {}) {
   }))
   const activationTransmission = composeActivationTransmission(activationSet)
 
+  // Decagonal Lineage Nodes — 10 decagonal gates around the solar lineage wheel.
+  const nodeResults = typeof decagonalNodeContacts === 'function' && typeof DECAGONAL_NODES !== 'undefined'
+    ? decagonalNodeContacts(glyphs, seated, natalWithCommands, DECAGONAL_NODES)
+    : []
+  const populatedNodes = nodeResults.filter(item => item.contacts && item.contacts.length > 0)
+
   // vii. Synthesis — ranked evidence, never exceeding what the chart supports.
   const evidence = [
     clusterEvidence(cluster, glyphs),
     ...angleEvidence(angles, angleConfidence),
+    ...nodeEvidence(nodeResults),
     ...courtEvidence(courts),
     ...gateEvidence(loudest),
     ...chordEvidence(chords),
@@ -377,6 +406,8 @@ export function computeReading(glyphs, source, natal, live, options = {}) {
     ambiguousPlaces,
     gates: { occupancy, loudest, silent, walk, braid },
     cluster,
+    nodes: nodeResults,
+    populatedNodes,
     lattice: { chords, families: [...families.entries()].map(([family, contacts]) => ({ family, contacts })) },
     synthesis: { ...transmission, sentence, activation: activationTransmission },
     packet,
