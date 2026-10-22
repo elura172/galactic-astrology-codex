@@ -1,0 +1,152 @@
+{
+  "package.json": {
+    "mtime": 1784020578.972931,
+    "ast_hash": "bd2297d06479fc30d5961d5e2a88854a",
+    "semantic_hash": "bd2297d06479fc30d5961d5e2a88854a"
+  },
+  "scripts/audit-reference.js": {
+    "mtime": 1784020578.9737844,
+    "ast_hash": "257b11d6deea04cb62b3b716eb59f169",
+    "semantic_hash": "257b11d6deea04cb62b3b716eb59f169"
+  },
+  "server/horizons.js": {
+    "mtime": 1784014346.5687695,
+    "ast_hash": "d5d14f3dba58d9d9a8c6986b1392b11d",
+    "semantic_hash": "d5d14f3dba58d9d9a8c6986b1392b11d"
+  },
+  "server/server.js": {
+    "mtime": 1784014346.5692391,
+    "ast_hash": "3c980a605027125be67ea3a487cd13a3",
+    "semantic_hash": "3c980a605027125be67ea3a487cd13a3"
+  },
+  "src/astrology.js": {
+    "mtime": 1784007348.7595925,
+    "ast_hash": "c408b35890abc12e56e346208ece1357",
+    "semantic_hash": "c408b35890abc12e56e346208ece1357"
+  },
+  "src/chart.js": {
+    "mtime": 1784014346.569951,
+    "ast_hash": "8537bac839afeb16dde472617bde2f84",
+    "semantic_hash": "8537bac839afeb16dde472617bde2f84"
+  },
+  "src/codex.js": {
+    "mtime": 1784007375.1968942,
+    "ast_hash": "4a9ecd4e8d6898d1934d575fc0ff7ef6",
+    "semantic_hash": "4a9ecd4e8d6898d1934d575fc0ff7ef6"
+  },
+  "src/gates.js": {
+    "mtime": 1785318847.2255862,
+    "ast_hash": "b63f6583646bf8b62bf19a61255114be",
+    "semantic_hash": "b63f6583646bf8b62bf19a61255114be"
+  },
+  "src/main.js": {
+    "mtime": 1785319576.389512,
+    "ast_hash": "6c6c274c2f0c74fa86a033a3613a1109",
+    "semantic_hash": "6c6c274c2f0c74fa86a033a3613a1109"
+  },
+  "src/reading.js": {
+    "mtime": 1784053774.8241305,
+    "ast_hash": "7e9cb6e56b832c474435d8f554689789",
+    "semantic_hash": "7e9cb6e56b832c474435d8f554689789"
+  },
+  "src/sky.js": {
+    "mtime": 1784020578.975924,
+    "ast_hash": "35347ef8de0a03cd900a8218299eb63c",
+    "semantic_hash": "35347ef8de0a03cd900a8218299eb63c"
+  },
+  "src/synthesis-packet.js": {
+    "mtime": 1784257532.4815595,
+    "ast_hash": "e329aecac157ec057db3628b2e2f4c0f",
+    "semantic_hash": "e329aecac157ec057db3628b2e2f4c0f"
+  },
+  "src/synthesis.js": {
+    "mtime": 1785319058.4493968,
+    "ast_hash": "06e91ef0d54ea9de208b001aa71af9ed",
+    "semantic_hash": "06e91ef0d54ea9de208b001aa71af9ed"
+  },
+  "tests/astrology.test.js": {
+    "mtime": 1784007348.8830075,
+    "ast_hash": "297231baf26ef433a3bd8e2471d4b52d",
+    "semantic_hash": "297231baf26ef433a3bd8e2471d4b52d"
+  },
+  "tests/chart.test.js": {
+    "mtime": 1784014346.5725708,
+    "ast_hash": "484bdd7ecc182ce9359627dde7985295",
+    "semantic_hash": "484bdd7ecc182ce9359627dde7985295"
+  },
+  "tests/codex.test.js": {
+    "mtime": 1784007375.3189528,
+    "ast_hash": "87e854d602d8e875fb2183f6134c8a77",
+    "semantic_hash": "87e854d602d8e875fb2183f6134c8a77"
+  },
+  "tests/gates.test.js": {
+    "mtime": 1785318882.7396288,
+    "ast_hash": "dc9fb2cae014b33c3927c3dc5351c443",
+    "semantic_hash": "dc9fb2cae014b33c3927c3dc5351c443"
+  },
+  "tests/horizons.test.js": {
+    "mtime": 1784014346.5727632,
+    "ast_hash": "9a82838ab4d933501d233b7ff2375bdd",
+    "semantic_hash": "9a82838ab4d933501d233b7ff2375bdd"
+  },
+  "tests/reading.test.js": {
+    "mtime": 1784053774.8248813,
+    "ast_hash": "404f8969283ddafe538face824fb0334",
+    "semantic_hash": "404f8969283ddafe538face824fb0334"
+  },
+  "tests/sky.test.js": {
+    "mtime": 1784020578.9777095,
+    "ast_hash": "0b3ff1248022773a0b63237fd2bdbdef",
+    "semantic_hash": "0b3ff1248022773a0b63237fd2bdbdef"
+  },
+  "tests/synthesis-packet.test.js": {
+    "mtime": 1784257532.6259866,
+    "ast_hash": "2d61a2a2eff28ca51606ef064d2345dd",
+    "semantic_hash": "2d61a2a2eff28ca51606ef064d2345dd"
+  },
+  "tests/synthesis.test.js": {
+    "mtime": 1784236547.886062,
+    "ast_hash": "ec37f90b6291062320515aa9a96c1eaa",
+    "semantic_hash": "ec37f90b6291062320515aa9a96c1eaa"
+  },
+  "vite.config.js": {
+    "mtime": 1784007919.4957185,
+    "ast_hash": "8ca0d3fae55df92142d5536fa3e36289",
+    "semantic_hash": "8ca0d3fae55df92142d5536fa3e36289"
+  },
+  "DESIGN_SYSTEM.md": {
+    "mtime": 1784001717.6456258,
+    "ast_hash": "1b03c17c1373121b5b91ece3ba822060",
+    "semantic_hash": "1b03c17c1373121b5b91ece3ba822060"
+  },
+  "EPHEMERIS_ARCHITECTURE.md": {
+    "mtime": 1784007349.0024295,
+    "ast_hash": "d4fdb14aea860f58c9cec690e4ad649f",
+    "semantic_hash": "d4fdb14aea860f58c9cec690e4ad649f"
+  },
+  "README.md": {
+    "mtime": 1784001724.9946783,
+    "ast_hash": "e18f3b955623f4c323470e52b525bd0e",
+    "semantic_hash": "e18f3b955623f4c323470e52b525bd0e"
+  },
+  "codex_of_celestial_glyphs.md": {
+    "mtime": 1784000691.8076966,
+    "ast_hash": "a3bbf5d753cde31ed26e497cd553bb97",
+    "semantic_hash": "a3bbf5d753cde31ed26e497cd553bb97"
+  },
+  "index.html": {
+    "mtime": 1784001717.5257983,
+    "ast_hash": "f8380b594ff7a8f675febe14a9217ed3",
+    "semantic_hash": "f8380b594ff7a8f675febe14a9217ed3"
+  },
+  "natal_resonance_template.md": {
+    "mtime": 1784000930.2295182,
+    "ast_hash": "19af4e590440d519cf047bceaebf3170",
+    "semantic_hash": "19af4e590440d519cf047bceaebf3170"
+  },
+  "star_lineage_companion_codex.md": {
+    "mtime": 1784000736.3023064,
+    "ast_hash": "111289047a3595310d0b317318f2a783",
+    "semantic_hash": "111289047a3595310d0b317318f2a783"
+  }
+}
