@@ -412,3 +412,34 @@ test('a seam body meets a planet once, not twice', () => {
     assert.equal(new Set(names).size, names.length, `${court.planet}'s court lists a body twice`)
   }
 })
+
+test('the reading computes 10 decagonal lineage nodes and ranks node evidence', () => {
+  const reading = pass()
+  assert.ok(Array.isArray(reading.nodes), 'reading.nodes must be an array')
+  assert.equal(reading.nodes.length, 10, 'must declare all 10 decagonal lineage nodes')
+  assert.ok(Array.isArray(reading.populatedNodes), 'reading.populatedNodes must be an array')
+
+  for (const item of reading.nodes) {
+    assert.ok(item.node.gate, 'each node has a gate label')
+    assert.ok(item.node.lineage, 'each node has a lineage name')
+    assert.ok(Number.isFinite(item.node.angle), 'each node has an angle degree')
+  }
+
+  // Check that node evidence can participate in synthesis evidence
+  const nodeEvidenceItems = reading.synthesis.evidence.filter(e => e.kind === 'node')
+  for (const item of nodeEvidenceItems) {
+    assert.ok(item.measurement.includes('Decagonal Node'), 'measurement mentions decagonal node')
+    assert.ok(item.themes.length > 0, 'node evidence carries themes')
+  }
+})
+
+test('resolveBirthplaceAsync resolves both known offline cities and async fallback', async () => {
+  const offlineMatch = await engine.resolveBirthplaceAsync('Kyoto, Japan')
+  assert.ok(offlineMatch, 'Kyoto should resolve')
+  assert.equal(offlineMatch.city, 'Kyoto')
+  assert.equal(offlineMatch.country, 'Japan')
+
+  const torontoMatch = await engine.resolveBirthplaceAsync('Toronto, Canada')
+  assert.ok(torontoMatch, 'Toronto should resolve from expanded register')
+  assert.equal(torontoMatch.country, 'Canada')
+})

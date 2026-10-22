@@ -28,6 +28,7 @@ const SOURCES = [
   'src/astrology.js',
   'src/codex.js',
   'src/chart.js',
+  'src/cities.js',
   'src/sky.js',
   'src/gates.js',
   'src/reading.js',
